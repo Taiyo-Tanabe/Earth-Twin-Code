@@ -33,6 +33,38 @@ def build_rolling_features(df: pd.DataFrame, target_col: str, windows: list[int]
     return df
 
 
+def _join_scout_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Neon の scout_features テーブルから Data Scout 発見特徴量を結合する"""
+    import os
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        return df
+    try:
+        import sqlalchemy as sa
+        connect_args = {"sslmode": "require"} if "neon.tech" in url else {}
+        engine = sa.create_engine(url, connect_args=connect_args)
+        with engine.connect() as conn:
+            rows = conn.execute(sa.text(
+                "SELECT country_code, year, feature_col, value FROM scout_features"
+            )).fetchall()
+        if not rows:
+            return df
+        scout_df = pd.DataFrame(rows, columns=["country_code", "year", "feature_col", "value"])
+        scout_wide = scout_df.pivot_table(
+            index=["country_code", "year"],
+            columns="feature_col",
+            values="value",
+            aggfunc="mean",
+        ).reset_index()
+        scout_wide.columns.name = None
+        n_features = len(scout_wide.columns) - 2
+        df = df.merge(scout_wide, on=["country_code", "year"], how="left")
+        logger.info(f"Scout features merged: {n_features} columns from Neon")
+    except Exception as e:
+        logger.warning(f"Scout feature join failed (non-fatal): {e}")
+    return df
+
+
 def build_neighbor_features(df: pd.DataFrame, adjacency_path: Path = None) -> pd.DataFrame:
     """隣国の紛争状況を特徴量として追加"""
     if adjacency_path is None or not adjacency_path.exists():
@@ -180,6 +212,9 @@ def build_panel() -> pd.DataFrame:
     # 9. 近隣効果
     adj_path = PROCESSED_PATH / "adjacency.csv"
     df = build_neighbor_features(df, adj_path)
+
+    # 9b. Data Scout 発見特徴量 (Neon scout_features から結合)
+    df = _join_scout_features(df)
 
     # 10. 予測用パネル保存 (ラベルシフト前の真の最新状態)
     # panel_latest.parquet: predict.py が使用する最新年データ

@@ -65,6 +65,26 @@ REGIME_FEATURE_COLS = FEATURE_COLS + [
     "regime_change_rolling5y",
 ]
 
+_LABEL_AND_ID_COLS = {
+    "country_code", "year",
+    "conflict_onset", "regime_change", "coup_attempt", "coup_success",
+    "label_conflict", "label_regime_change",
+    "refugees_total", "idp_total",
+}
+
+
+def _extend_with_scout_cols(df: pd.DataFrame, base_cols: list) -> list:
+    """パネルに存在する Scout 発見列（base_cols 以外の数値列）を追加する"""
+    exclude = set(base_cols) | _LABEL_AND_ID_COLS
+    scout_cols = [
+        c for c in df.select_dtypes(include="number").columns
+        if c not in exclude and df[c].notna().sum() >= 50
+    ]
+    if scout_cols:
+        logger.info(f"Scout features added to training: {scout_cols}")
+    return base_cols + scout_cols
+
+
 XGB_PARAMS = {
     "n_estimators": 300,
     "max_depth": 4,
@@ -82,6 +102,7 @@ XGB_PARAMS = {
 def walk_forward_validation(
     df: pd.DataFrame,
     label_col: str,
+    feature_cols: list = None,
     train_start: int = 1990,
     val_start: int = 2010,
     end_year: int = 2022,
@@ -100,10 +121,11 @@ def walk_forward_validation(
         if len(train_df) < 100 or len(val_df) == 0:
             continue
 
-        feature_cols = [c for c in FEATURE_COLS if c in train_df.columns]
-        X_train = train_df[feature_cols].fillna(train_df[feature_cols].median())
+        _cols = feature_cols if feature_cols else [c for c in FEATURE_COLS if c in train_df.columns]
+        _cols = [c for c in _cols if c in train_df.columns]
+        X_train = train_df[_cols].fillna(train_df[_cols].median())
         y_train = train_df[label_col].fillna(0).astype(int)
-        X_val = val_df[feature_cols].fillna(train_df[feature_cols].median())
+        X_val = val_df[_cols].fillna(train_df[_cols].median())
         y_val = val_df[label_col].fillna(0).astype(int)
 
         model = xgb.XGBClassifier(**XGB_PARAMS)
@@ -130,10 +152,10 @@ def train_conflict_model() -> dict:
         return {}
 
     df = pd.read_parquet(panel_path)
-    metrics = walk_forward_validation(df, "label_conflict")
+    feature_cols = _extend_with_scout_cols(df, [c for c in FEATURE_COLS if c in df.columns])
+    metrics = walk_forward_validation(df, "label_conflict", feature_cols=feature_cols)
 
     # 全データで最終モデルを学習
-    feature_cols = [c for c in FEATURE_COLS if c in df.columns]
     X = df[feature_cols].fillna(df[feature_cols].median())
     y = df["label_conflict"].fillna(0).astype(int)
 
@@ -188,9 +210,9 @@ def train_regime_model() -> dict:
 
     regime_params = {**XGB_PARAMS, "scale_pos_weight": spw, "min_child_weight": 1}
 
-    metrics = walk_forward_validation(df, "label_regime_change")
+    feature_cols = _extend_with_scout_cols(df, [c for c in REGIME_FEATURE_COLS if c in df.columns])
+    metrics = walk_forward_validation(df, "label_regime_change", feature_cols=feature_cols)
 
-    feature_cols = [c for c in REGIME_FEATURE_COLS if c in df.columns]
     logger.info(f"Regime model features ({len(feature_cols)}): {[f for f in feature_cols if 'regime' in f]}")
     X = df[feature_cols].fillna(df[feature_cols].median())
     y = df["label_regime_change"].astype(int)
