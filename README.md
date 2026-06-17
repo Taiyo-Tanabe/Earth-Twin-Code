@@ -10,7 +10,7 @@
 
 | | URL |
 |---|---|
-| **アプリ** | https://earth-twin-phi.vercel.app |
+| **アプリ** | https://earth-twin-tt.vercel.app |
 | **API** | https://earth-twin-api.onrender.com/global_map |
 
 ---
