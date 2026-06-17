@@ -1,179 +1,186 @@
-# Earth Twin — Probabilistic World Model
+# Earth Twin — 確率的世界モデル
 
-Earth Twin is not a geopolitical prediction tool. It is a **copy of the world** — a probabilistic model that continuously absorbs physical, biological, ecological, economic, and social signals to reproduce the state of Earth in real time.
+Earth Twin は地政学的予測ツールではない。**世界のコピー**だ。物理・生物・生態・経済・社会のシグナルをリアルタイムで吸収し、地球の状態を確率として再現する。
 
-> *If a complex system is fully reproduced and the universe contains no true randomness, the future becomes deterministic. Since full reproduction is impossible, we express outcomes as probability.*
+> *複雑系を完全に再現できれば、宇宙に真の乱数が存在しない限り未来は確定する。完全な再現は不可能だから、我々は確率として表現する。*
 
 ![version](https://img.shields.io/badge/version-0.1-00d2aa?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square) ![Python](https://img.shields.io/badge/python-3.11-blue?style=flat-square) ![React](https://img.shields.io/badge/react-18-61dafb?style=flat-square)
 
 ---
 
-## Live
+## ライブ
 
 | | URL |
 |---|---|
-| **App** | https://earth-twin-phi.vercel.app |
+| **アプリ** | https://earth-twin-phi.vercel.app |
 | **API** | https://earth-twin-api.onrender.com/global_map |
 
 ---
 
-## Architecture
+## アーキテクチャ
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  Vercel (Frontend)                           │
-│   React + Leaflet  ·  3-layer risk map  ·  Arc gauges       │
+│                  Vercel (フロントエンド)                      │
+│   React + Leaflet  ·  3層リスクマップ  ·  Arcゲージ           │
 └──────────────────────────┬──────────────────────────────────┘
                            │ HTTPS (VITE_API_URL)
 ┌──────────────────────────▼──────────────────────────────────┐
-│                  Render (Backend API)                        │
+│                  Render (バックエンド API)                    │
 │   FastAPI  ·  /global_map  ·  /country/{code}  ·  /health   │
 └──────────────────────────┬──────────────────────────────────┘
                            │ PostgreSQL (DATABASE_URL)
 ┌──────────────────────────▼──────────────────────────────────┐
-│                  Neon (Database)                             │
+│                  Neon (データベース)                          │
 │   risk_predictions  ·  raw_signals                          │
 └──────────────────────────▲──────────────────────────────────┘
                            │
 ┌──────────────────────────┴──────────────────────────────────┐
-│                  Railway (Background Worker)                 │
+│                  Railway (バックグラウンドワーカー)            │
 │                                                             │
-│  ┌─ Collectors (13 sources, always-on threads)              │
-│  │   Earthquake · GDELT · Weather · Solar · Wildfire        │
-│  │   Sea Temp · WHO · Food · Locust · Commodity             │
-│  │   Economic · UCDP · V-Dem · World Bank                   │
+│  ┌─ コレクター (13ソース、常時稼働スレッド)                    │
+│  │   地震 · GDELT · 気象 · 太陽活動 · 山火事                  │
+│  │   海水温 · WHO · 食料 · バッタ · コモディティ               │
+│  │   経済 · UCDP · V-Dem · 世界銀行                          │
 │  │           │ XADD                                         │
 │  │    ┌──────▼──────┐                                       │
 │  │    │Upstash Redis│  (Streams)                            │
 │  │    └──────┬──────┘                                       │
 │  │           │ XREAD                                        │
-│  ├─ Stream Processor → Neon raw_signals                     │
-│  │   (500 rows蓄積で予測を自動トリガー)                        │
+│  ├─ ストリームプロセッサ → Neon raw_signals                   │
+│  │   (500行蓄積で予測を自動トリガー)                           │
 │  │                                                          │
-│  ├─ Data Scout (every 6h)                                   │
+│  ├─ Data Scout (6時間ごと)                                   │
 │  │   Claude が新データソースを5件発見・統合                     │
 │  │                                                          │
-│  └─ Daily Predict (every 24h)                               │
+│  └─ 日次予測 (24時間ごと)                                    │
 │      学習済みモデルで全国予測 → Neon risk_predictions 更新     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Infrastructure
+## インフラ
 
-| Layer | Service | Plan |
+| レイヤー | サービス | プラン |
 |---|---|---|
-| Frontend | Vercel | Free |
-| Backend API | Render | Free (sleeps on idle) |
-| Database | Neon | Free |
-| Message Queue | Upstash Redis | Free (500k cmd/mo) |
-| Background Worker | Railway | Free ($5 credit/mo) |
+| フロントエンド | Vercel | 無料 |
+| バックエンド API | Render | 無料（アイドル時スリープ） |
+| データベース | Neon | 無料 |
+| メッセージキュー | Upstash Redis | 無料（50万コマンド/月） |
+| バックグラウンドワーカー | Railway | 無料（$5クレジット/月） |
 
 **月額 $0**（Railway の $5 クレジット内で収まる見込み）
 
 ---
 
-## Risk Layers
+## リスクレイヤー
 
-| Layer | Data Source | Description |
+| レイヤー | データソース | 説明 |
 |---|---|---|
-| **Overall Risk** | Composite | Conflict × 0.6 + Coup × 0.4 |
-| **Conflict Risk** | UCDP GED | 25+ battle deaths/year |
-| **Coup Risk** | Powell-Thyne | Coup attempts 1950–present |
+| **総合リスク** | 複合 | 紛争 × 0.6 + クーデター × 0.4 |
+| **紛争リスク** | UCDP GED | 年25件以上の戦闘死者 |
+| **クーデターリスク** | Powell-Thyne | 1950年以降のクーデター試み |
 
 ---
 
-## Data Sources
+## データソース
 
-### Core training data (annual, local pipeline)
+### 年次学習データ（ローカルパイプライン）
 
-| Source | Domain |
+| ソース | ドメイン |
 |---|---|
-| UCDP GED | Armed conflict events |
-| Powell-Thyne Coups | Coup attempts |
-| V-Dem | Democracy indices |
-| World Bank WDI | GDP, inflation, unemployment |
-| WGI | Governance indicators |
-| UNHCR | Refugee population |
+| UCDP GED | 武力紛争イベント |
+| Powell-Thyne Coups | クーデター試み |
+| V-Dem | 民主主義指標 |
+| World Bank WDI | GDP・インフレ・失業率 |
+| WGI | ガバナンス指標 |
+| UNHCR | 難民・国内避難民 |
 
-### Streaming sources (always-on, Railway worker)
+### ストリーミングソース（常時稼働、Railwayワーカー）
 
-| Source | Domain | Interval |
+| ソース | ドメイン | 間隔 |
 |---|---|---|
-| USGS Earthquake | Physical | 60s |
-| GDELT v2 | News / Social | 15min |
-| Open-Meteo | Weather | 1h |
-| NOAA SWPC | Solar activity | 1h |
-| NASA FIRMS | Wildfire | 24h |
-| NOAA Nino3.4 | Sea temperature | 24h |
-| WHO GHO | Disease | 24h |
-| World Bank prices | Food | 24h |
-| FAO Desert Locust | Ecological | 24h |
-| Commodity prices | Economic | 6h |
-| World Bank signals | Economic | 6h |
+| USGS 地震 | 物理 | 60秒 |
+| GDELT v2 | ニュース・社会 | 15分 |
+| Open-Meteo | 気象 | 1時間 |
+| NOAA SWPC | 太陽活動 | 1時間 |
+| NASA FIRMS | 山火事 | 24時間 |
+| NOAA Nino3.4 | 海水温 | 24時間 |
+| WHO GHO | 疾病 | 24時間 |
+| World Bank 価格 | 食料 | 24時間 |
+| FAO 砂漠バッタ | 生態 | 24時間 |
+| コモディティ価格 | 経済 | 6時間 |
+| World Bank シグナル | 経済 | 6時間 |
 
-### Autonomous discovery (Data Scout, every 6h)
+### 自律的発見（Data Scout、6時間ごと）
 
-Claude (AI) が毎6時間、新しいオープンデータソースを5件発見・統合する。対象ドメインは社会系に限らず物理・生物・生態系・経済系すべて。
-
----
-
-## Models
-
-### Conflict Risk (XGBoost + Platt calibration)
-- Label: UCDP GED conflict onset (25+ battle deaths/year)
-- Features: WGI governance, V-Dem democracy, economic indicators, conflict history lags, neighbor spillover, GDELT signals
-- Validation: Walk-forward (1990–2022)
-
-### Coup Risk (XGBoost + Platt calibration)
-- Label: Powell-Thyne coup attempts
-- Class imbalance: scale_pos_weight ~132× (~0.75% positive rate)
-- Label shift: shift(-2) — 2-year forward prediction
+Claudeが毎6時間、新しいオープンデータソースを5件発見・統合する。対象ドメインは社会系に限らず物理・生物・生態系・経済系すべて。
 
 ---
 
-## Update Cycle
+## モデル
 
-| What | When | How |
+### 紛争リスク（XGBoost + Platt calibration）
+- ラベル: UCDP GED 紛争発生（年25件以上の戦闘死者）
+- 特徴量: WGIガバナンス、V-Dem民主主義、経済指標、紛争履歴ラグ、隣国スピルオーバー、GDELTシグナル
+- バリデーション: ウォークフォワード（1990–2022）
+
+### クーデターリスク（XGBoost + Platt calibration）
+- ラベル: Powell-Thyne クーデター試み
+- クラス不均衡: scale_pos_weight 約132倍（陽性率 約0.75%）
+- ラベルシフト: shift(-2)（2年先予測）
+
+---
+
+## 更新サイクル
+
+| 更新内容 | タイミング | 方法 |
 |---|---|---|
-| Raw signals | Continuously | Railway collectors → Upstash → Neon |
-| Predictions | Every 24h | Railway daily-predict → Neon |
-| New data sources | Every 6h | Railway Data Scout (Claude) |
-| Model retraining | Annually | Local pipeline → push_to_neon.py → git push |
+| 生シグナル | 常時 | Railwayコレクター → Upstash → Neon |
+| 予測値 | 24時間ごと | Railway 日次予測 → Neon |
+| 新データソース | 6時間ごと | Railway Data Scout（Claude） |
+| モデル再学習 | **年1回（自動）** | GitHub Actions → Neon → git push |
 
 ---
 
-## Local Development
+## 年次自動更新（GitHub Actions）
+
+毎年2月1日（UCDP更新）と4月1日（V-Dem更新）に自動実行される:
+
+```
+.github/workflows/annual_update.yml
+  ├─ データ取得（UCDP / V-Dem / WorldBank / WGI / UNHCR）
+  ├─ 特徴量エンジニアリング
+  ├─ XGBoost 再学習
+  ├─ 予測値を Neon に書き込み
+  └─ 更新済みモデルを git commit & push → Railway 自動デプロイ
+```
+
+手動実行: GitHub リポジトリの **Actions** タブ → `Annual Model Update` → `Run workflow`
+
+必要なシークレット（`Settings > Secrets > Actions`）:
+
+| シークレット | 説明 |
+|---|---|
+| `DATABASE_URL` | Neon PostgreSQL URL |
+
+---
+
+## ローカル開発
 
 ```bash
 git clone https://github.com/Taiyo-Tanabe/Earth-Twin-Code.git
 cd Earth-Twin-Code
 cp .env.example .env
-# Edit .env with your credentials
+# .env に認証情報を記入
 
-# Frontend
+# フロントエンド
 cd frontend && npm install && npm run dev
 
-# Backend API
+# バックエンド API
 cd backend && pip install -r requirements.txt
 uvicorn api.main:app --reload --port 8001
-```
-
----
-
-## Annual Model Update (manual)
-
-新しい UCDP / V-Dem データがリリースされた年に1回実行:
-
-```bash
-cd backend
-python pipeline_runner.py        # Download + feature engineering + retrain
-python push_to_neon.py           # Push new predictions to Neon
-
-git add data/models/ data/processed/panel_latest.parquet
-git commit -m "update: retrain with 2025 data"
-git push                         # Railway auto-deploys new models
 ```
 
 ---
@@ -186,7 +193,7 @@ git push                         # Railway auto-deploys new models
   "countries": [
     {
       "country_code": "AFG",
-      "country_name": "Afghanistan",
+      "country_name": "アフガニスタン",
       "risk_score": 0.958,
       "conflict_probability_1y": 0.958,
       "regime_change_probability_1y": 0.031,
@@ -207,6 +214,6 @@ git push                         # Railway auto-deploys new models
 
 ---
 
-## License
+## ライセンス
 
 MIT

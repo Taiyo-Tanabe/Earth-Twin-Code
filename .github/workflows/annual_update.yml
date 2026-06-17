@@ -1,0 +1,59 @@
+name: Annual Model Update
+
+on:
+  schedule:
+    - cron: '0 0 1 2 *'   # Feb 1 — UCDP release cycle
+    - cron: '0 0 1 4 *'   # Apr 1 — V-Dem release cycle
+  workflow_dispatch:        # Manual trigger
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements-workers.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements-workers.txt
+          pip install wbgapi==1.0.12 openpyxl==3.1.4 mlflow==2.13.0
+
+      - name: Create /app/data symlink
+        run: |
+          sudo mkdir -p /app
+          sudo ln -s ${{ github.workspace }}/backend/data /app/data
+          mkdir -p backend/data/models backend/data/processed backend/data/raw
+
+      - name: Run pipeline (steps 1–9, skip GDELT)
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python pipeline_runner.py --to-step 9 --skip-gdelt
+
+      - name: Push predictions to Neon
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python push_to_neon.py
+
+      - name: Commit updated models
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/data/models/ backend/data/processed/panel_latest.parquet
+          git diff --staged --quiet || (
+            git commit -m "auto: retrain models $(date +%Y-%m-%d)"
+            git push
+          )
