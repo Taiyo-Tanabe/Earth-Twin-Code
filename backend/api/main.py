@@ -405,9 +405,18 @@ def global_map():
     )
 
     from datetime import date, timedelta
-    today = date.today()
-    prediction_from = today.strftime("%Y/%m/%d")
-    prediction_to   = (today + timedelta(days=365)).strftime("%Y/%m/%d")
+    try:
+        pred_year = int(model_version.split("-")[-1]) if model_version and model_version.startswith("xgb-v1-") else None
+    except (ValueError, AttributeError):
+        pred_year = None
+
+    if pred_year:
+        prediction_from = f"{pred_year}/01/01"
+        prediction_to   = f"{pred_year}/12/31"
+    else:
+        today = date.today()
+        prediction_from = today.strftime("%Y/%m/%d")
+        prediction_to   = (today + timedelta(days=365)).strftime("%Y/%m/%d")
 
     return GlobalMapResponse(
         countries=countries,
