@@ -229,8 +229,8 @@ def build_panel() -> pd.DataFrame:
     # 例: データ年=2023, 今=2026 → shift(-3) → 2023特徴量で2026を予測
     import datetime as _dt
     data_year = int(df["year"].max())
-    horizon = max(1, _dt.date.today().year - data_year)
-    logger.info(f"Label shift horizon: -{horizon} (data_year={data_year}, today={_dt.date.today().year})")
+    horizon = max(1, _dt.date.today().year - data_year + 1)
+    logger.info(f"Label shift horizon: -{horizon} (data_year={data_year}, pred_year={data_year + horizon})")
 
     df["label_conflict"] = df.groupby("country_code")["conflict_onset"].shift(-horizon)
     df["label_regime_change"] = (

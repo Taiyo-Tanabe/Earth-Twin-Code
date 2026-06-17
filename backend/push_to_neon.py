@@ -116,9 +116,9 @@ def run():
     latest_path = PROCESSED_PATH / "panel_latest.parquet"
     df = pd.read_parquet(latest_path)
     data_year = int(df["year"].max())
-    horizon = max(1, datetime.date.today().year - data_year)
-    pred_year = data_year + horizon          # モデルが実際に予測している年
-    model_version = f"xgb-v1-{pred_year}"  # API が予測期間を読み取るためにエンコード
+    horizon = max(1, datetime.date.today().year - data_year + 1)
+    pred_year = data_year + horizon
+    model_version = f"xgb-v1-{pred_year}"
     print(f"[OK] panel_latest: {len(df)} countries, data_year={data_year}, pred_year={pred_year}")
 
     # 予測
