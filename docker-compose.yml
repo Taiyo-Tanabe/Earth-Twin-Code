@@ -1,35 +1,5 @@
 version: "3.9"
 
-x-airflow-common: &airflow-common
-  image: apache/airflow:2.9.1
-  environment:
-    AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
-    AIRFLOW__CORE__FERNET_KEY: ""
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
-    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
-    # Airflow にない backend 依存パッケージのみ追加 (sqlalchemy/psycopg2/requests はAirflow同梱)
-    _PIP_ADDITIONAL_REQUIREMENTS: >-
-      xgboost==2.0.3 scikit-learn==1.5.0 joblib==1.4.2
-      pycountry==23.12.11 openpyxl==3.1.4 wbgapi==1.0.12
-    MINIO_ENDPOINT: http://minio:9000
-    MINIO_ACCESS_KEY: earthtwin
-    MINIO_SECRET_KEY: earthtwin123
-    TIMESCALE_URL: postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin
-    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-    ACLED_EMAIL: ${ACLED_EMAIL:-}
-    ACLED_PASSWORD: ${ACLED_PASSWORD:-}
-  volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/logs:/opt/airflow/logs
-    - ./airflow/plugins:/opt/airflow/plugins
-    - ./backend:/opt/airflow/backend
-    - ./backend/data:/app/data  # backend と同じデータパスをAirflowでも使用
-  depends_on:
-    postgres-airflow:
-      condition: service_healthy
-
 services:
   # ── Frontend ──────────────────────────────────────────
   frontend:
@@ -49,8 +19,10 @@ services:
       - "8001:8000"
     volumes:
       - ./backend:/app
+      - earth_data:/app/data
     environment:
       TIMESCALE_URL: postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin
+      REDIS_URL: redis://redis:6379
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: earthtwin
       MINIO_SECRET_KEY: earthtwin123
@@ -60,8 +32,79 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  # ── TimescaleDB (時系列PostgreSQL) ────────────────────
+  # ── Collector (常時稼働・全データソース) ──────────────
+  collector:
+    build: ./backend
+    command: python -m collectors.runner
+    volumes:
+      - ./backend:/app
+      - earth_data:/app/data
+    environment:
+      TIMESCALE_URL: postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: earthtwin
+      MINIO_SECRET_KEY: earthtwin123
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ACLED_EMAIL: ${ACLED_EMAIL:-}
+      ACLED_PASSWORD: ${ACLED_PASSWORD:-}
+    restart: always
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Stream Processor (Redis → TimescaleDB) ────────────
+  stream-processor:
+    build: ./backend
+    command: python -m collectors.stream_processor
+    volumes:
+      - ./backend:/app
+      - earth_data:/app/data
+    environment:
+      TIMESCALE_URL: postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin
+      REDIS_URL: redis://redis:6379
+    restart: always
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Data Scout (常時稼働・6時間ごとに新ソース探索) ────
+  data-scout:
+    build: ./backend
+    command: python -m agents.scout_runner
+    volumes:
+      - ./backend:/app
+      - earth_data:/app/data
+    environment:
+      TIMESCALE_URL: postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin
+      REDIS_URL: redis://redis:6379
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    restart: always
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Redis (メッセージキュー) ───────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  # ── TimescaleDB ────────────────────────────────────────
   timescaledb:
     image: timescale/timescaledb:latest-pg16
     ports:
@@ -91,7 +134,7 @@ services:
     volumes:
       - minio_data:/data
 
-  # ── MLflow (モデル管理) ───────────────────────────────
+  # ── MLflow ────────────────────────────────────────────
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.13.0
     ports:
@@ -109,51 +152,7 @@ services:
       timescaledb:
         condition: service_healthy
 
-  # ── Airflow Postgres (メタDB) ─────────────────────────
-  postgres-airflow:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    volumes:
-      - airflow_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 5s
-      retries: 10
-
-  # ── Airflow Init ──────────────────────────────────────
-  airflow-init:
-    <<: *airflow-common
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        airflow db migrate
-        airflow users create --username admin --firstname Admin --lastname User \
-          --role Admin --email admin@earthtwin.local --password admin
-    restart: "no"
-
-  # ── Airflow Webserver ─────────────────────────────────
-  airflow-webserver:
-    <<: *airflow-common
-    command: webserver
-    ports:
-      - "8080:8080"
-    depends_on:
-      airflow-init:
-        condition: service_completed_successfully
-
-  # ── Airflow Scheduler ─────────────────────────────────
-  airflow-scheduler:
-    <<: *airflow-common
-    command: scheduler
-    depends_on:
-      airflow-init:
-        condition: service_completed_successfully
-
 volumes:
   timescale_data:
   minio_data:
-  airflow_pg_data:
+  earth_data:

@@ -27,5 +27,8 @@ wbgapi==1.0.12
 pycountry==23.12.11
 openpyxl==3.1.4
 
+# Streaming / Queue
+redis==5.0.4
+
 # AI Agent
 anthropic==0.30.0

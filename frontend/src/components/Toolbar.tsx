@@ -8,6 +8,7 @@ interface Props {
   predictionFrom?: string | null;
   predictionTo?: string | null;
   onLayerChange: (l: RiskLayer) => void;
+  onConceptOpen?: () => void;
 }
 
 const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
@@ -15,7 +16,7 @@ const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
   { value: "regime_change", label: "Coup Risk", color: "#a855f7" },
 ];
 
-export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange }: Props) {
+export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange, onConceptOpen }: Props) {
   const predRange = predictionFrom && predictionTo ? `${predictionFrom} – ${predictionTo}` : "1-Year Forecast";
   const activeLayer = LAYERS.find((l) => l.value === riskLayer)!;
   const [, setTick] = useState(0);
@@ -113,6 +114,33 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange
           </div>
           <div style={{ fontSize: 8, color: "rgba(228,237,245,0.2)", marginTop: 1, fontFamily: "monospace" }}>{timeStr}</div>
         </div>
+
+        {onConceptOpen && (
+          <>
+            <div style={sep} />
+            <button
+              onClick={onConceptOpen}
+              title="About Earth Twin"
+              style={{
+                background: "none",
+                border: "1px solid rgba(0,210,170,0.2)",
+                borderRadius: "50%",
+                width: 28, height: 28,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+                color: "rgba(0,210,170,0.6)",
+                fontSize: 13,
+                fontWeight: 700,
+                flexShrink: 0,
+                transition: "all 0.12s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0,210,170,0.08)"; e.currentTarget.style.color = "#00d2aa"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "rgba(0,210,170,0.6)"; }}
+            >
+              ?
+            </button>
+          </>
+        )}
       </div>
 
       <div style={bottomAccent} />

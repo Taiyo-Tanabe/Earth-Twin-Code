@@ -6,6 +6,7 @@ import { Toolbar } from "./components/Toolbar";
 import { MobileToolbar } from "./components/MobileToolbar";
 import { SearchBar } from "./components/SearchBar";
 import { TopRiskList } from "./components/TopRiskList";
+import { ConceptOverlay } from "./components/ConceptOverlay";
 import { useRiskData } from "./hooks/useRiskData";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { RiskLayer } from "./types";
@@ -14,6 +15,7 @@ import "./app.css";
 export default function App() {
   const [riskLayer, setRiskLayer] = useState<RiskLayer>("conflict");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [showConcept, setShowConcept] = useState(false);
 
   const isMobile = useIsMobile();
   const { countries, updatedAt, dataYear, predictionFrom, predictionTo, conflictDefinition, regimeChangeDefinition, loading, getCountry } = useRiskData();
@@ -41,6 +43,7 @@ export default function App() {
           predictionFrom={predictionFrom}
           predictionTo={predictionTo}
           onLayerChange={setRiskLayer}
+          onConceptOpen={() => setShowConcept(true)}
         />
       )}
 
@@ -97,7 +100,7 @@ export default function App() {
 
         {!isMobile && !selectedCode && !loading && (
           <div style={hintStyle}>
-            国をクリックしてリスク詳細を表示
+            Click a country to view risk details
           </div>
         )}
       </div>
@@ -113,6 +116,8 @@ export default function App() {
           onClose={handleClose}
         />
       )}
+
+      {showConcept && <ConceptOverlay onClose={() => setShowConcept(false)} />}
     </div>
   );
 }
