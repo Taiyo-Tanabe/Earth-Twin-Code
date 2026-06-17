@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, useMap, ZoomControl } from "react-leaflet";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import { CountryRisk, RiskLayer } from "../types";
 
@@ -140,7 +140,6 @@ export function RiskMap({ countries, selectedCode, riskLayer, onCountryClick }: 
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
       />
-      <ZoomControl position={isMobile ? "bottomleft" : "topleft"} />
       <GeoJSONLayer
         countries={countries}
         selectedCode={selectedCode}
