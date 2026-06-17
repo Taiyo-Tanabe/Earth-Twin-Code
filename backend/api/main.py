@@ -67,8 +67,10 @@ class GlobalMapResponse(BaseModel):
     updated_at: str
     model_version: str
     data_year: Optional[int] = None
-    prediction_from: Optional[str] = None   # 予測開始日 (予測実行日, YYYY-MM-DD)
-    prediction_to: Optional[str] = None     # 予測終了日 (1年後, YYYY-MM-DD)
+    prediction_from: Optional[str] = None
+    prediction_to: Optional[str] = None
+    available_years: list[int] = []
+    selected_year: Optional[int] = None
     conflict_definition: str = "UCDP GED: Countries with 25+ battle-related deaths per year (interstate, civil, and non-state violence)"
     regime_change_definition: str = "Powell-Thyne: Coup attempts against the incumbent head of state (successful or failed, 1950–present)"
 
@@ -162,16 +164,42 @@ def _load_panel_econ() -> dict:
         return {}
 
 
-def _load_from_db() -> tuple[list[dict], dict]:
+def _load_available_years() -> list[int]:
+    """Neonに存在するmodel_versionから利用可能な予測年リストを返す"""
+    try:
+        import sqlalchemy as sa
+        engine = _get_db()
+        with engine.connect() as conn:
+            rows = conn.execute(sa.text(
+                "SELECT DISTINCT model_version FROM risk_predictions WHERE model_version LIKE 'xgb-v1-%'"
+            )).fetchall()
+        years = []
+        for r in rows:
+            try:
+                y = int(r[0].split("-")[-1])
+                if 2020 <= y <= 2050:
+                    years.append(y)
+            except (ValueError, IndexError):
+                pass
+        return sorted(years)
+    except Exception:
+        return []
+
+
+def _load_from_db(pred_year: int = None) -> tuple[list[dict], dict]:
     """
-    TimescaleDB から最新予測と前週の予測を取得。
-    Returns (latest_rows, prev_risk_by_code)
+    Neon から最新予測と前週の予測を取得。
+    pred_year を指定するとその年のモデルのみ返す。
     """
     try:
         import sqlalchemy as sa
         engine = _get_db()
         with engine.connect() as conn:
-            rows = conn.execute(sa.text("""
+            if pred_year:
+                where = f"WHERE model_version = 'xgb-v1-{pred_year}'"
+            else:
+                where = ""
+            rows = conn.execute(sa.text(f"""
                 SELECT DISTINCT ON (country_code)
                     country_code,
                     conflict_probability,
@@ -181,21 +209,22 @@ def _load_from_db() -> tuple[list[dict], dict]:
                     model_version,
                     time
                 FROM risk_predictions
+                {where}
                 ORDER BY country_code, time DESC
             """)).fetchall()
 
-            # 前週のスコアを取得（トレンド計算用）
-            prev_rows = conn.execute(sa.text("""
+            prev_rows = conn.execute(sa.text(f"""
                 SELECT DISTINCT ON (country_code)
                     country_code,
                     risk_score
                 FROM risk_predictions
                 WHERE time < NOW() - INTERVAL '3 days'
+                {("AND model_version = 'xgb-v1-" + str(pred_year) + "'") if pred_year else ""}
                 ORDER BY country_code, time DESC
             """)).fetchall()
 
         if rows:
-            logger.info(f"Loaded {len(rows)} predictions from DB")
+            logger.info(f"Loaded {len(rows)} predictions from DB (year={pred_year})")
             latest = [dict(r._mapping) for r in rows]
             prev_map = {r.country_code: r.risk_score for r in prev_rows}
             return latest, prev_map
@@ -344,8 +373,10 @@ _HARDCODED_STUBS: dict[str, dict] = {
 
 
 @app.get("/global_map", response_model=GlobalMapResponse)
-def global_map():
-    db_rows, prev_map = _load_from_db()
+def global_map(year: Optional[int] = None):
+    available_years = _load_available_years()
+    selected_year = year if year in available_years else (available_years[-1] if available_years else None)
+    db_rows, prev_map = _load_from_db(pred_year=selected_year)
     econ_map = _load_panel_econ()
 
     if db_rows:
@@ -404,13 +435,17 @@ def global_map():
         else "WGI proxy: Sharp drop in political stability score (Powell-Thyne data unavailable)"
     )
 
-    from datetime import date
-    if data_year:
-        pred_year = data_year + max(1, date.today().year - data_year + 1)
+    if selected_year:
+        prediction_from = f"{selected_year}/01/01"
+        prediction_to   = f"{selected_year}/12/31"
+    elif data_year:
+        from datetime import date
+        py = data_year + max(1, date.today().year - data_year + 1)
+        prediction_from = f"{py}/01/01"
+        prediction_to   = f"{py}/12/31"
     else:
-        pred_year = date.today().year + 1
-    prediction_from = f"{pred_year}/01/01"
-    prediction_to   = f"{pred_year}/12/31"
+        prediction_from = None
+        prediction_to   = None
 
     return GlobalMapResponse(
         countries=countries,
@@ -419,6 +454,8 @@ def global_map():
         data_year=data_year,
         prediction_from=prediction_from,
         prediction_to=prediction_to,
+        available_years=available_years,
+        selected_year=selected_year,
         conflict_definition=conflict_def,
         regime_change_definition=regime_def,
     )

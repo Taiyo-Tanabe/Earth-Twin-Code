@@ -2,23 +2,25 @@ import { useState, useEffect } from "react";
 import { CountryRisk, RiskLayer } from "../types";
 import { MOCK_COUNTRIES, MOCK_UPDATED_AT } from "../data/mockData";
 
-// Dev: "/api" is proxied by Vite to the local backend
-// Prod: set VITE_API_URL=https://your-app.onrender.com in Vercel env vars
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
-export function useRiskData() {
+export function useRiskData(selectedYear: number | null = null) {
   const [countries, setCountries] = useState<CountryRisk[]>([]);
   const [updatedAt, setUpdatedAt] = useState("");
   const [dataYear, setDataYear] = useState<number | null>(null);
   const [predictionFrom, setPredictionFrom] = useState<string | null>(null);
   const [predictionTo, setPredictionTo] = useState<string | null>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [conflictDefinition, setConflictDefinition] = useState<string>("");
   const [regimeChangeDefinition, setRegimeChangeDefinition] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_BASE}/global_map`)
+    const url = selectedYear
+      ? `${API_BASE}/global_map?year=${selectedYear}`
+      : `${API_BASE}/global_map`;
+    fetch(url)
       .then((r) => r.json())
       .then((data) => {
         setCountries(data.countries as CountryRisk[]);
@@ -26,6 +28,7 @@ export function useRiskData() {
         setDataYear(data.data_year ?? null);
         setPredictionFrom(data.prediction_from ?? null);
         setPredictionTo(data.prediction_to ?? null);
+        setAvailableYears(data.available_years ?? []);
         setConflictDefinition(data.conflict_definition ?? "");
         setRegimeChangeDefinition(data.regime_change_definition ?? "");
       })
@@ -35,14 +38,18 @@ export function useRiskData() {
         setDataYear(null);
         setPredictionFrom(null);
         setPredictionTo(null);
+        setAvailableYears([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedYear]);
 
   const getCountry = (code: string) =>
     countries.find((c) => c.country_code === code) ?? null;
 
-  return { countries, updatedAt, dataYear, predictionFrom, predictionTo, conflictDefinition, regimeChangeDefinition, loading, getCountry };
+  return {
+    countries, updatedAt, dataYear, predictionFrom, predictionTo,
+    availableYears, conflictDefinition, regimeChangeDefinition, loading, getCountry,
+  };
 }
 
 export function sortByLayer(countries: CountryRisk[], layer: RiskLayer) {

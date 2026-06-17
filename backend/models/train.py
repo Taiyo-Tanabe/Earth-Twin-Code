@@ -148,9 +148,12 @@ def walk_forward_validation(
     return {"roc_auc": roc_auc, "brier_score": brier}
 
 
-def train_conflict_model() -> dict:
-    """紛争確率モデルを学習し、MLflowに記録"""
-    panel_path = PROCESSED_PATH / "panel_features.parquet"
+def train_conflict_model(pred_year: int = None) -> dict:
+    """紛争確率モデルを学習。pred_year を指定すると年別ファイルを使用。"""
+    suffix = f"_{pred_year}" if pred_year else ""
+    panel_path = PROCESSED_PATH / f"panel_features{suffix}.parquet"
+    if not panel_path.exists():
+        panel_path = PROCESSED_PATH / "panel_features.parquet"
     if not panel_path.exists():
         logger.error("Panel data not found. Run build_panel() first.")
         return {}
@@ -160,40 +163,30 @@ def train_conflict_model() -> dict:
     last_year = int(df["year"].max())
     metrics = walk_forward_validation(df, "label_conflict", feature_cols=feature_cols, end_year=last_year)
 
-    # 全データで最終モデルを学習
     X = df[feature_cols].fillna(df[feature_cols].median())
     y = df["label_conflict"].fillna(0).astype(int)
 
     final_model = xgb.XGBClassifier(**XGB_PARAMS)
     final_model.fit(X, y, verbose=False)
 
-    # Platt Scaling でキャリブレーション (sklearn 1.4+ は cv="prefit" 非対応)
     calibrated = CalibratedClassifierCV(final_model, method="sigmoid", cv=5)
     calibrated.fit(X, y)
 
     from ingestion.utils import save_joblib
     MODEL_PATH.mkdir(parents=True, exist_ok=True)
-    save_joblib(calibrated, MODEL_PATH / "conflict_model_calibrated.pkl")
-    save_joblib(feature_cols, MODEL_PATH / "conflict_feature_cols.pkl")
-    logger.info("Conflict model saved locally.")
-
-    mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "")
-    if mlflow_uri:
-        try:
-            mlflow.set_tracking_uri(mlflow_uri)
-            with mlflow.start_run(run_name="conflict_model"):
-                mlflow.log_params(XGB_PARAMS)
-                mlflow.log_metrics(metrics)
-                mlflow.xgboost.log_model(final_model, "conflict_xgb")
-        except Exception as e:
-            logger.warning(f"MLflow logging skipped: {e}")
+    save_joblib(calibrated, MODEL_PATH / f"conflict_model{suffix}_calibrated.pkl")
+    save_joblib(feature_cols, MODEL_PATH / f"conflict_feature_cols{suffix}.pkl")
+    logger.info(f"Conflict model saved (pred_year={pred_year}): ROC-AUC={metrics.get('roc_auc', 0):.3f}")
 
     return metrics
 
 
-def train_regime_model() -> dict:
-    """政権崩壊確率モデルを学習"""
-    panel_path = PROCESSED_PATH / "panel_features.parquet"
+def train_regime_model(pred_year: int = None) -> dict:
+    """政権崩壊確率モデルを学習。pred_year を指定すると年別ファイルを使用。"""
+    suffix = f"_{pred_year}" if pred_year else ""
+    panel_path = PROCESSED_PATH / f"panel_features{suffix}.parquet"
+    if not panel_path.exists():
+        panel_path = PROCESSED_PATH / "panel_features.parquet"
     if not panel_path.exists():
         return {}
 
@@ -207,11 +200,10 @@ def train_regime_model() -> dict:
         logger.warning(f"Too few regime change events ({int(df['label_regime_change'].sum())}). Skipping.")
         return {}
 
-    # クーデターは陽性率~0.75% → scale_pos_weight を動的計算
     pos = df["label_regime_change"].sum()
     neg = len(df) - pos
     spw = max(int(neg / pos), 10)
-    logger.info(f"Regime model: pos={int(pos)}, neg={int(neg)}, scale_pos_weight={spw}")
+    logger.info(f"Regime model (pred_year={pred_year}): pos={int(pos)}, neg={int(neg)}, scale_pos_weight={spw}")
 
     regime_params = {**XGB_PARAMS, "scale_pos_weight": spw, "min_child_weight": 1}
 
@@ -219,30 +211,16 @@ def train_regime_model() -> dict:
     last_year = int(df["year"].max())
     metrics = walk_forward_validation(df, "label_regime_change", feature_cols=feature_cols, end_year=last_year)
 
-    logger.info(f"Regime model features ({len(feature_cols)}): {[f for f in feature_cols if 'regime' in f]}")
     X = df[feature_cols].fillna(df[feature_cols].median())
     y = df["label_regime_change"].astype(int)
 
     final_model = xgb.XGBClassifier(**regime_params)
     final_model.fit(X, y, verbose=False)
 
-    # クーデターは陽性率0.75%のため CalibratedClassifierCV は使わない
-    # (sigmoid calibration が全予測を0近辺に圧縮してしまう)
-    # XGBoost の scale_pos_weight で確率を直接出力する
     from ingestion.utils import save_joblib
     MODEL_PATH.mkdir(parents=True, exist_ok=True)
-    save_joblib(final_model, MODEL_PATH / "regime_model_calibrated.pkl")
-    save_joblib(feature_cols, MODEL_PATH / "regime_feature_cols.pkl")
-    logger.info(f"Regime model saved. Features used: {len(feature_cols)}")
-
-    mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "")
-    if mlflow_uri:
-        try:
-            mlflow.set_tracking_uri(mlflow_uri)
-            with mlflow.start_run(run_name="regime_change_model"):
-                mlflow.log_params(XGB_PARAMS)
-                mlflow.log_metrics(metrics)
-        except Exception as e:
-            logger.warning(f"MLflow logging skipped: {e}")
+    save_joblib(final_model, MODEL_PATH / f"regime_model{suffix}_calibrated.pkl")
+    save_joblib(feature_cols, MODEL_PATH / f"regime_feature_cols{suffix}.pkl")
+    logger.info(f"Regime model saved (pred_year={pred_year}). Features: {len(feature_cols)}")
 
     return metrics

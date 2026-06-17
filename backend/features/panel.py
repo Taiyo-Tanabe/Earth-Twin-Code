@@ -86,7 +86,7 @@ def build_neighbor_features(df: pd.DataFrame, adjacency_path: Path = None) -> pd
     return df
 
 
-def build_panel() -> pd.DataFrame:
+def build_panel(horizon: int = None) -> pd.DataFrame:
     """
     全データソースを結合して学習用パネルデータを構築。
     返り値: country_code × year の特徴量+ラベル行列
@@ -227,11 +227,12 @@ def build_panel() -> pd.DataFrame:
     logger.info(f"Prediction panel saved: {latest_df.shape}, latest_year={latest_year} → {latest_path}")
 
     # 11. ラベルシフト: 現在年 − データ最新年 を動的に計算
-    # 例: データ年=2023, 今=2026 → shift(-3) → 2023特徴量で2026を予測
     import datetime as _dt
     data_year = int(df["year"].max())
-    horizon = max(1, _dt.date.today().year - data_year + 1)
-    logger.info(f"Label shift horizon: -{horizon} (data_year={data_year}, pred_year={data_year + horizon})")
+    if horizon is None:
+        horizon = max(1, _dt.date.today().year - data_year + 1)
+    pred_year = data_year + horizon
+    logger.info(f"Label shift horizon: -{horizon} (data_year={data_year}, pred_year={pred_year})")
 
     df["label_conflict"] = df.groupby("country_code")["conflict_onset"].shift(-horizon)
     df["label_regime_change"] = (
@@ -243,8 +244,10 @@ def build_panel() -> pd.DataFrame:
     # ラベルがNaN（直近horizon年分）→ 除外
     df = df.dropna(subset=["label_conflict"])
 
-    output_path = PROCESSED_PATH / "panel_features.parquet"
-    save_parquet(df, output_path)
+    # 予測年別ファイルと、デフォルトファイルに保存
+    save_parquet(df, PROCESSED_PATH / f"panel_features_{pred_year}.parquet")
+    if horizon is None or True:  # default file も常に更新
+        save_parquet(df, PROCESSED_PATH / "panel_features.parquet")
 
     n_countries = df["country_code"].nunique()
     pos_rate = df["label_conflict"].mean()

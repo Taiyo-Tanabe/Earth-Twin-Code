@@ -4,7 +4,10 @@ interface Props {
   riskLayer: RiskLayer;
   predictionFrom?: string | null;
   predictionTo?: string | null;
+  availableYears?: number[];
+  selectedYear?: number | null;
   onLayerChange: (l: RiskLayer) => void;
+  onYearChange?: (y: number) => void;
   onConceptOpen?: () => void;
 }
 
@@ -14,7 +17,7 @@ const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
   { value: "regime_change", label: "Coup",     color: "#a855f7" },
 ];
 
-export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange, onConceptOpen }: Props) {
+export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, availableYears = [], selectedYear, onLayerChange, onYearChange, onConceptOpen }: Props) {
   const predRange = predictionFrom && predictionTo ? `${predictionFrom} – ${predictionTo}` : "1-Year Forecast";
 
   return (
@@ -72,6 +75,16 @@ export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, onLayer
           </button>
         ))}
       </div>
+
+      {availableYears.length > 1 && onYearChange && (
+        <div style={{ display: "flex", gap: 4, width: "100%" }}>
+          {availableYears.map((y) => (
+            <button key={y} onClick={() => onYearChange(y)} style={chip(selectedYear === y, "#60a5fa")}>
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

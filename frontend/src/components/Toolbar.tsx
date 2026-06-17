@@ -7,7 +7,10 @@ interface Props {
   updatedAt: string;
   predictionFrom?: string | null;
   predictionTo?: string | null;
+  availableYears?: number[];
+  selectedYear?: number | null;
   onLayerChange: (l: RiskLayer) => void;
+  onYearChange?: (y: number) => void;
   onConceptOpen?: () => void;
 }
 
@@ -17,7 +20,7 @@ const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
   { value: "regime_change", label: "Coup Risk",     color: "#a855f7" },
 ];
 
-export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange, onConceptOpen }: Props) {
+export function Toolbar({ riskLayer, predictionFrom, predictionTo, availableYears = [], selectedYear, onLayerChange, onYearChange, onConceptOpen }: Props) {
   const predRange = predictionFrom && predictionTo ? `${predictionFrom} – ${predictionTo}` : "1-Year Forecast";
   const activeLayer = LAYERS.find((l) => l.value === riskLayer)!;
   const [, setTick] = useState(0);
@@ -80,6 +83,23 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange
           ))}
         </div>
       </div>
+
+      {/* Year selector — shown only when multiple years available */}
+      {availableYears.length > 1 && onYearChange && (
+        <>
+          <div style={sep} />
+          <div style={group}>
+            <div style={groupLabel}>FORECAST YEAR</div>
+            <div style={{ display: "flex", gap: 2 }}>
+              {availableYears.map((y) => (
+                <button key={y} onClick={() => onYearChange(y)} style={chip(selectedYear === y, "#60a5fa")}>
+                  {y}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {showScale && <div style={sep} />}
 

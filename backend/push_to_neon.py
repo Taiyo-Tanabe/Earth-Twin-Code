@@ -97,6 +97,50 @@ def _feature_importances(model, feature_cols):
     return pd.Series(imp, index=feature_cols)
 
 
+def _predict_for_year(df: pd.DataFrame, pred_year: int) -> pd.DataFrame:
+    """指定された pred_year のモデルで予測を生成して返す"""
+    suffix = f"_{pred_year}"
+    conflict_model_path  = MODEL_PATH / f"conflict_model{suffix}_calibrated.pkl"
+    conflict_cols_path   = MODEL_PATH / f"conflict_feature_cols{suffix}.pkl"
+    regime_model_path    = MODEL_PATH / f"regime_model{suffix}_calibrated.pkl"
+    regime_cols_path     = MODEL_PATH / f"regime_feature_cols{suffix}.pkl"
+
+    # 年別ファイルがなければデフォルトにフォールバック
+    if not conflict_model_path.exists():
+        conflict_model_path = MODEL_PATH / "conflict_model_calibrated.pkl"
+        conflict_cols_path  = MODEL_PATH / "conflict_feature_cols.pkl"
+    if not regime_model_path.exists():
+        regime_model_path = MODEL_PATH / "regime_model_calibrated.pkl"
+        regime_cols_path  = MODEL_PATH / "regime_feature_cols.pkl"
+
+    if not conflict_model_path.exists():
+        print(f"[SKIP] No model files for pred_year={pred_year}")
+        return pd.DataFrame()
+
+    conflict_model    = joblib.load(conflict_model_path)
+    conflict_features = joblib.load(conflict_cols_path)
+    regime_model      = joblib.load(regime_model_path)
+    regime_features   = joblib.load(regime_cols_path)
+
+    result = df.copy()
+    avail_c = [c for c in conflict_features if c in result.columns]
+    X_c     = result[avail_c].fillna(result[avail_c].median())
+    result["conflict_probability"] = conflict_model.predict_proba(X_c)[:, 1]
+
+    avail_r = [c for c in regime_features if c in result.columns]
+    X_r     = result[avail_r].fillna(result[avail_r].median())
+    result["regime_change_probability"] = regime_model.predict_proba(X_r)[:, 1]
+
+    result["risk_score"] = (
+        result["conflict_probability"] * 0.6
+        + result["regime_change_probability"] * 0.4
+    )
+
+    imp = _feature_importances(conflict_model, avail_c)
+    result["top_features"] = _top_features(X_c, avail_c, imp)
+    return result
+
+
 def run():
     db_url = os.environ.get("DATABASE_URL") or os.environ.get("TIMESCALE_URL")
     if not db_url:
@@ -105,59 +149,22 @@ def run():
 
     print(f"DB: {db_url[:40]}...")
 
-    # モデル読み込み
-    conflict_model    = joblib.load(MODEL_PATH / "conflict_model_calibrated.pkl")
-    conflict_features = joblib.load(MODEL_PATH / "conflict_feature_cols.pkl")
-    regime_model      = joblib.load(MODEL_PATH / "regime_model_calibrated.pkl")
-    regime_features   = joblib.load(MODEL_PATH / "regime_feature_cols.pkl")
-    print("[OK] model loaded")
-
     # パネルデータ読み込み
     latest_path = PROCESSED_PATH / "panel_latest.parquet"
     df = pd.read_parquet(latest_path)
     data_year = int(df["year"].max())
-    horizon = max(1, datetime.date.today().year - data_year + 1)
-    pred_year = data_year + horizon
-    model_version = f"xgb-v1-{pred_year}"
-    print(f"[OK] panel_latest: {len(df)} countries, data_year={data_year}, pred_year={pred_year}")
 
-    # 予測
-    avail_c = [c for c in conflict_features if c in df.columns]
-    X_c     = df[avail_c].fillna(df[avail_c].median())
-    df["conflict_probability"] = conflict_model.predict_proba(X_c)[:, 1]
+    # 利用可能なモデル年を検出（デフォルト horizon + その前年）
+    default_horizon = max(1, datetime.date.today().year - data_year + 1)
+    default_pred_year = data_year + default_horizon
+    pred_years = sorted({default_pred_year - 1, default_pred_year})
+    pred_years = [y for y in pred_years if y > data_year]
 
-    avail_r = [c for c in regime_features if c in df.columns]
-    X_r     = df[avail_r].fillna(df[avail_r].median())
-    df["regime_change_probability"] = regime_model.predict_proba(X_r)[:, 1]
+    print(f"[OK] panel_latest: {len(df)} countries, data_year={data_year}")
+    print(f"[OK] prediction years: {pred_years}")
 
-    df["risk_score"] = (
-        df["conflict_probability"] * 0.6
-        + df["regime_change_probability"] * 0.4
-    )
-
-    imp = _feature_importances(conflict_model, avail_c)
-    df["top_features"] = _top_features(X_c, avail_c, imp)
-    print(f"[OK] predictions done: {len(df)} countries")
-
-    # Neon に書き込み
     connect_args = {"sslmode": "require"} if "neon.tech" in db_url else {}
     engine = sa.create_engine(db_url, connect_args=connect_args)
-
-    now  = datetime.datetime.utcnow()
-    rows = []
-    for _, row in df.iterrows():
-        regime_p = row.get("regime_change_probability", 0)
-        if regime_p is None or (isinstance(regime_p, float) and math.isnan(regime_p)):
-            regime_p = 0.0
-        rows.append({
-            "time":                      now,
-            "country_code":              row["country_code"],
-            "model_version":             model_version,
-            "conflict_probability":      float(row["conflict_probability"]),
-            "regime_change_probability": float(regime_p),
-            "risk_score":                float(row["risk_score"]),
-            "top_features":              json.dumps(row.get("top_features", [])),
-        })
 
     insert_sql = sa.text("""
         INSERT INTO risk_predictions
@@ -169,11 +176,37 @@ def run():
              CAST(:top_features AS jsonb))
     """)
 
-    with engine.begin() as conn:
-        for r in rows:
-            conn.execute(insert_sql, r)
+    total = 0
+    for pred_year in pred_years:
+        result = _predict_for_year(df, pred_year)
+        if result.empty:
+            continue
 
-    print(f"[OK] inserted {len(rows)} rows into Neon")
+        model_version = f"xgb-v1-{pred_year}"
+        now = datetime.datetime.utcnow()
+        rows = []
+        for _, row in result.iterrows():
+            regime_p = row.get("regime_change_probability", 0)
+            if regime_p is None or (isinstance(regime_p, float) and math.isnan(regime_p)):
+                regime_p = 0.0
+            rows.append({
+                "time":                      now,
+                "country_code":              row["country_code"],
+                "model_version":             model_version,
+                "conflict_probability":      float(row["conflict_probability"]),
+                "regime_change_probability": float(regime_p),
+                "risk_score":                float(row["risk_score"]),
+                "top_features":              json.dumps(row.get("top_features", [])),
+            })
+
+        with engine.begin() as conn:
+            for r in rows:
+                conn.execute(insert_sql, r)
+
+        print(f"[OK] {pred_year}: inserted {len(rows)} rows (model_version={model_version})")
+        total += len(rows)
+
+    print(f"[OK] total {total} rows inserted into Neon")
     print("  -> reload Vercel to see live data")
 
 

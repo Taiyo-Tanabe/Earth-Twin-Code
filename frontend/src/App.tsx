@@ -16,9 +16,15 @@ export default function App() {
   const [riskLayer, setRiskLayer] = useState<RiskLayer>("conflict");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [showConcept, setShowConcept] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
   const isMobile = useIsMobile();
-  const { countries, updatedAt, dataYear, predictionFrom, predictionTo, conflictDefinition, regimeChangeDefinition, loading, getCountry } = useRiskData();
+  const { countries, updatedAt, dataYear, predictionFrom, predictionTo, availableYears, conflictDefinition, regimeChangeDefinition, loading, getCountry } = useRiskData(selectedYear);
+
+  const handleYearChange = (y: number) => {
+    setSelectedYear(y);
+    setSelectedCode(null);
+  };
   const selectedCountry = selectedCode ? getCountry(selectedCode) : null;
 
   const toolbarHeight = isMobile ? 66 : 56;
@@ -36,7 +42,10 @@ export default function App() {
           riskLayer={riskLayer}
           predictionFrom={predictionFrom}
           predictionTo={predictionTo}
+          availableYears={availableYears}
+          selectedYear={selectedYear ?? availableYears[availableYears.length - 1]}
           onLayerChange={setRiskLayer}
+          onYearChange={handleYearChange}
           onConceptOpen={() => setShowConcept(true)}
         />
       ) : (
@@ -45,7 +54,10 @@ export default function App() {
           updatedAt={updatedAt}
           predictionFrom={predictionFrom}
           predictionTo={predictionTo}
+          availableYears={availableYears}
+          selectedYear={selectedYear ?? availableYears[availableYears.length - 1]}
           onLayerChange={setRiskLayer}
+          onYearChange={handleYearChange}
           onConceptOpen={() => setShowConcept(true)}
         />
       )}
