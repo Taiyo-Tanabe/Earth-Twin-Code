@@ -13,66 +13,93 @@ function riskColor(v: number) {
   if (v >= 0.4) return "#ffd440";
   return "#aaff44";
 }
-
-function getLayerValue(c: CountryRisk, layer: RiskLayer): number {
+function getVal(c: CountryRisk, layer: RiskLayer) {
   if (layer === "regime_change") return c.regime_change_probability_1y;
+  if (layer === "overall") return c.risk_score;
   return c.conflict_probability_1y;
 }
-
-function formatValue(value: number): string {
-  if (value < 0.001) return "< 0.1%";
-  if (value < 0.01)  return `${(value * 100).toFixed(2)}%`;
-  if (value < 0.1)   return `${(value * 100).toFixed(1)}%`;
-  return `${(value * 100).toFixed(0)}%`;
+function fmt(v: number) {
+  if (v < 0.001) return "< 0.1%";
+  if (v < 0.01)  return `${(v * 100).toFixed(2)}%`;
+  if (v < 0.1)   return `${(v * 100).toFixed(1)}%`;
+  return `${(v * 100).toFixed(0)}%`;
 }
+
+const RANK_COLORS = ["#ffd440", "rgba(228,237,245,0.35)", "rgba(228,237,245,0.2)", "rgba(228,237,245,0.12)", "rgba(228,237,245,0.08)"];
 
 export function TopRiskList({ countries, riskLayer, selectedCode, onSelect }: Props) {
   const sorted = [...countries]
-    .sort((a, b) => getLayerValue(b, riskLayer) - getLayerValue(a, riskLayer))
+    .sort((a, b) => getVal(b, riskLayer) - getVal(a, riskLayer))
     .slice(0, 5);
 
-  const titles: Record<RiskLayer, string> = {
-    conflict: "Conflict Risk TOP 5",
-    regime_change: "Coup Risk TOP 5",
-  };
+  const layerLabel = riskLayer === "regime_change" ? "Coup Risk" : riskLayer === "overall" ? "Overall Risk" : "Conflict Risk";
 
   return (
     <div style={containerStyle}>
-      <div style={headerStyle}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(228,237,245,0.45)", letterSpacing: "0.06em" }}>
-          {titles[riskLayer]}
-        </span>
-        <span style={{ fontSize: 8, color: "rgba(228,237,245,0.2)", fontFamily: "monospace" }}>1-Year Forecast</span>
+      {/* Header */}
+      <div style={{ padding: "11px 14px 9px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+        <div style={{ fontSize: 9, color: "rgba(228,237,245,0.25)", letterSpacing: "0.1em" }}>
+          {layerLabel.toUpperCase()} · TOP 5
+        </div>
       </div>
 
+      {/* Rows */}
       {sorted.map((c, i) => {
-        const value = getLayerValue(c, riskLayer);
+        const value = getVal(c, riskLayer);
         const color = riskColor(value);
         const isSelected = c.country_code === selectedCode;
+        const pct = Math.min(value * 100, 100);
 
         return (
           <button
             key={c.country_code}
             onClick={() => onSelect(c.country_code)}
-            style={rowStyle(isSelected, color)}
-            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "rgba(228,237,245,0.03)"; }}
-            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "none"; }}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              width: "100%", background: isSelected ? `${color}10` : "transparent",
+              border: "none", cursor: "pointer", padding: "9px 14px",
+              textAlign: "left", transition: "background 0.12s",
+              borderBottom: i < 4 ? "1px solid rgba(255,255,255,0.03)" : "none",
+            }}
+            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = "transparent"; }}
           >
-            <span style={{ fontSize: 10, color: "rgba(228,237,245,0.2)", fontFamily: "monospace", width: 14, flexShrink: 0 }}>
+            {/* Rank */}
+            <span style={{
+              fontSize: 10, fontWeight: 700,
+              color: isSelected ? color : RANK_COLORS[i],
+              fontFamily: "monospace", width: 14, flexShrink: 0, textAlign: "right",
+            }}>
               {i + 1}
             </span>
 
+            {/* Name + bar */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: isSelected ? "#e4edf5" : "rgba(228,237,245,0.75)", fontWeight: isSelected ? 600 : 400, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div style={{
+                fontSize: 12, fontWeight: isSelected ? 600 : 400,
+                color: isSelected ? "#e4edf5" : "rgba(228,237,245,0.7)",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                marginBottom: 4,
+              }}>
                 {c.country_name}
               </div>
-              <div style={{ height: 2, background: "rgba(255,255,255,0.05)", borderRadius: 1, marginTop: 4, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${Math.min(value * 100, 100)}%`, background: color, borderRadius: 1, opacity: 0.8 }} />
+              {/* Track */}
+              <div style={{ height: 2, background: "rgba(255,255,255,0.05)", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{
+                  height: "100%", width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${color}cc, ${color})`,
+                  borderRadius: 2, transition: "width 0.5s ease",
+                }} />
               </div>
             </div>
 
-            <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
-              {formatValue(value)}
+            {/* Value */}
+            <span style={{
+              fontSize: 12, fontWeight: 700, color: isSelected ? color : "rgba(228,237,245,0.6)",
+              fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
+              minWidth: 42, textAlign: "right",
+            }}>
+              {fmt(value)}
             </span>
           </button>
         );
@@ -86,36 +113,11 @@ const containerStyle: React.CSSProperties = {
   bottom: 24,
   left: 12,
   zIndex: 800,
-  width: 220,
-  background: "rgba(8, 16, 26, 0.94)",
-  backdropFilter: "blur(16px)",
-  border: "1px solid rgba(0, 210, 170, 0.1)",
-  borderRadius: 6,
+  width: 240,
+  background: "rgba(8, 14, 22, 0.94)",
+  backdropFilter: "blur(20px)",
+  border: "1px solid rgba(255,255,255,0.07)",
+  borderRadius: 10,
   overflow: "hidden",
-  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.45)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)",
 };
-
-const headerStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  borderBottom: "1px solid rgba(228,237,245,0.05)",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-};
-
-function rowStyle(isSelected: boolean, color: string): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    width: "100%",
-    background: isSelected ? `${color}12` : "none",
-    border: "none",
-    borderBottom: "1px solid rgba(228,237,245,0.04)",
-    borderLeft: isSelected ? `2px solid ${color}` : "2px solid transparent",
-    cursor: "pointer",
-    padding: "8px 12px 8px 10px",
-    textAlign: "left",
-    transition: "background 0.1s",
-  };
-}

@@ -40,7 +40,7 @@ export function SearchBar({ countries, onSelect, isMobile }: Props) {
     <div style={{
       position: "absolute",
       top: isMobile ? 8 : 12,
-      left: isMobile ? 12 : 12,
+      left: isMobile ? 12 : 50,
       zIndex: 900,
       width: open ? (isMobile ? "calc(100vw - 24px)" : 250) : 40,
       transition: "width 0.2s ease",

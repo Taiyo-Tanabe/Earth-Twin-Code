@@ -12,6 +12,7 @@ interface Props {
 
 function getRiskValue(country: CountryRisk, layer: RiskLayer): number {
   if (layer === "regime_change") return country.regime_change_probability_1y;
+  if (layer === "overall") return country.risk_score;
   return country.conflict_probability_1y;
 }
 
@@ -33,6 +34,7 @@ function formatPct(value: number): string {
 
 function layerLabel(layer: RiskLayer): string {
   if (layer === "regime_change") return "Coup Risk";
+  if (layer === "overall") return "Overall Risk";
   return "Conflict Risk";
 }
 

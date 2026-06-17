@@ -12,8 +12,9 @@ interface Props {
 }
 
 const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
+  { value: "overall",       label: "Overall Risk",  color: "#00d2aa" },
   { value: "conflict",      label: "Conflict Risk", color: "#ff4466" },
-  { value: "regime_change", label: "Coup Risk", color: "#a855f7" },
+  { value: "regime_change", label: "Coup Risk",     color: "#a855f7" },
 ];
 
 export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange, onConceptOpen }: Props) {
@@ -62,7 +63,7 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange
             <span style={{ color: "#00d2aa" }}>EARTH</span>
             <span style={{ color: "rgba(228,237,245,0.9)", marginLeft: 5 }}>TWIN</span>
           </div>
-          {showSubtitle && <div style={{ fontSize: 9, color: "rgba(0,210,170,0.45)", letterSpacing: "0.12em", marginTop: 1 }}>GLOBAL RISK INTELLIGENCE · {predRange}</div>}
+          {showSubtitle && <div style={{ fontSize: 9, color: "rgba(0,210,170,0.45)", letterSpacing: "0.12em", marginTop: 1 }}>PROBABILISTIC WORLD MODEL · {predRange}</div>}
         </div>
       </div>
 

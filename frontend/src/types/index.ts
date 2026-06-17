@@ -22,4 +22,4 @@ export interface GlobalMapData {
   regime_change_definition?: string;
 }
 
-export type RiskLayer = "conflict" | "regime_change";
+export type RiskLayer = "conflict" | "regime_change" | "overall";

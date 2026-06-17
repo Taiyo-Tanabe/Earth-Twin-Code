@@ -18,7 +18,6 @@ function riskColor(v: number) {
   if (v >= 0.2) return "#aaff44";
   return "#00d2aa";
 }
-
 function riskLabel(v: number) {
   if (v >= 0.8) return "CRITICAL";
   if (v >= 0.6) return "HIGH";
@@ -26,91 +25,106 @@ function riskLabel(v: number) {
   if (v >= 0.2) return "GUARDED";
   return "LOW";
 }
+function riskTrend(t: CountryRisk["risk_trend"]) {
+  if (t === "up")   return { sym: "↑", label: "Rising",    color: "#ff4466" };
+  if (t === "down") return { sym: "↓", label: "Declining", color: "#00d2aa" };
+  return              { sym: "→", label: "Stable",     color: "rgba(228,237,245,0.3)" };
+}
+function fmt(v: number) {
+  if (v < 0.001) return "< 0.1";
+  if (v < 0.01)  return (v * 100).toFixed(2);
+  return (v * 100).toFixed(1);
+}
 
-function ProbBar({ value, color }: { value: number; color: string }) {
+function Arc({ value, color, size = 52 }: { value: number; color: string; size?: number }) {
+  const sw = 3.5;
+  const r  = (size - sw) / 2;
+  const c  = size / 2;
+  const circ = 2 * Math.PI * r;
+  const arc  = circ * 0.75;
+  const fill = Math.min(value, 1) * arc;
   return (
-    <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden", marginTop: 6 }}>
-      <div style={{
-        height: "100%",
-        width: `${value * 100}%`,
-        background: color,
-        borderRadius: 2,
-        transition: "width 0.5s ease",
-        opacity: 0.85,
-      }} />
-    </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+         style={{ transform: "rotate(-225deg)", flexShrink: 0 }}>
+      <circle cx={c} cy={c} r={r} fill="none"
+        stroke="rgba(255,255,255,0.06)" strokeWidth={sw}
+        strokeDasharray={`${arc} ${circ - arc}`} strokeLinecap="round" />
+      <circle cx={c} cy={c} r={r} fill="none"
+        stroke={color} strokeWidth={sw} strokeOpacity={0.9}
+        strokeDasharray={`${fill} ${circ - fill}`} strokeLinecap="round"
+        style={{ transition: "stroke-dasharray 0.65s cubic-bezier(0.4,0,0.2,1)" }} />
+    </svg>
   );
 }
 
-function TrendBadge({ trend }: { trend: CountryRisk["risk_trend"] }) {
-  const map = {
-    up:     { label: "↑ Rising",  color: "#ff4466" },
-    down:   { label: "↓ Declining",  color: "#00d2aa" },
-    stable: { label: "→ Stable",  color: "rgba(228,237,245,0.35)" },
-  };
-  const t = map[trend];
-  return (
-    <span style={{ fontSize: 10, color: t.color, fontFamily: "'JetBrains Mono', monospace" }}>
-      {t.label}
-    </span>
-  );
-}
-
-export function CountryPanel({ country, dataYear, predictionFrom, predictionTo, conflictDefinition, regimeChangeDefinition, onClose }: Props) {
+export function CountryPanel({
+  country, predictionFrom, predictionTo,
+  conflictDefinition, regimeChangeDefinition, onClose,
+}: Props) {
   if (!country) return null;
 
-  const color = riskColor(country.risk_score);
-  const label = riskLabel(country.risk_score);
+  const color    = riskColor(country.risk_score);
+  const label    = riskLabel(country.risk_score);
+  const trend    = riskTrend(country.risk_trend);
   const predLabel = predictionFrom && predictionTo
     ? `${predictionFrom} – ${predictionTo}`
     : "1-Year Forecast";
 
   return (
     <div style={panelStyle}>
-      <div style={{ height: 2, background: `linear-gradient(90deg, ${color}, transparent)` }} />
+      {/* top accent */}
+      <div style={{ height: 1, background: `linear-gradient(90deg, ${color}cc, transparent 60%)` }} />
 
-      {/* Header */}
-      <div style={{ padding: "16px 18px 14px" }}>
+      {/* ── Header ─────────────────────────────── */}
+      <div style={{ padding: "18px 18px 0" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 10, color: "rgba(228,237,245,0.3)", letterSpacing: "0.1em", fontFamily: "monospace" }}>
+            <div style={{ fontSize: 10, color: "rgba(228,237,245,0.25)", letterSpacing: "0.12em", fontFamily: "monospace" }}>
               {country.country_code}
             </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: "#e4edf5", marginTop: 2, lineHeight: 1.2 }}>
+            <div style={{ fontSize: 19, fontWeight: 700, color: "#e4edf5", marginTop: 3, lineHeight: 1.25, letterSpacing: "-0.01em" }}>
               {country.country_name}
             </div>
           </div>
           <button onClick={onClose} style={closeBtnStyle}>✕</button>
         </div>
+      </div>
 
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14 }}>
-          <span style={{ fontSize: 42, fontWeight: 800, color, lineHeight: 1, fontFamily: "'JetBrains Mono', monospace" }}>
-            {country.risk_score < 0.001 ? "< 0.1" : country.risk_score < 0.01 ? (country.risk_score * 100).toFixed(2) : (country.risk_score * 100).toFixed(1)}
-          </span>
-          <span style={{ fontSize: 18, color: "rgba(228,237,245,0.3)", fontFamily: "monospace" }}>%</span>
-          <div style={{ marginLeft: 2 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: "0.08em" }}>{label}</div>
-            <TrendBadge trend={country.risk_trend} />
+      {/* ── Hero stat ─────────────────────────── */}
+      <div style={{ margin: "14px 14px 0", padding: "16px", background: "rgba(255,255,255,0.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <span style={{ fontSize: 44, fontWeight: 800, color, lineHeight: 1, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em" }}>
+                {fmt(country.risk_score)}
+              </span>
+              <span style={{ fontSize: 18, color: "rgba(228,237,245,0.25)", fontFamily: "monospace", fontWeight: 400 }}>%</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: "0.1em", background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 4, padding: "2px 7px" }}>
+                {label}
+              </span>
+              <span style={{ fontSize: 10, color: trend.color, letterSpacing: "0.04em" }}>
+                {trend.sym} {trend.label}
+              </span>
+            </div>
+            <div style={{ fontSize: 9, color: "rgba(228,237,245,0.2)", marginTop: 6, letterSpacing: "0.04em" }}>
+              Overall Risk · {predLabel}
+            </div>
           </div>
-        </div>
-        <ProbBar value={country.risk_score} color={color} />
-        <div style={{ fontSize: 9, color: "rgba(228,237,245,0.25)", marginTop: 4 }}>
-          Overall Risk — {predLabel}
+          <Arc value={country.risk_score} color={color} size={56} />
         </div>
       </div>
 
-      <hr style={hrStyle} />
-
-      {/* Risk indicators */}
-      <div style={{ padding: "0 18px" }}>
-        <SectionLabel>RISK INDICATORS — {predLabel}</SectionLabel>
-        <MetricRow
+      {/* ── Two stat cards ────────────────────── */}
+      <div style={{ margin: "10px 14px 0", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <StatCard
           label="Conflict Risk"
           value={country.conflict_probability_1y}
           color="#ff4466"
           definition={conflictDefinition}
         />
-        <MetricRow
+        <StatCard
           label="Coup Risk"
           value={country.regime_change_probability_1y}
           color="#a855f7"
@@ -118,103 +132,98 @@ export function CountryPanel({ country, dataYear, predictionFrom, predictionTo, 
         />
       </div>
 
-
-      <hr style={hrStyle} />
-      <div style={{ padding: "0 18px 18px" }}>
-        <SectionLabel>KEY RISK FACTORS</SectionLabel>
-        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 1 }}>
+      {/* ── Risk factors ──────────────────────── */}
+      <div style={{ margin: "16px 14px 0" }}>
+        <div style={{ fontSize: 9, color: "rgba(228,237,245,0.22)", letterSpacing: "0.1em", marginBottom: 10 }}>
+          KEY RISK FACTORS
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {country.top_features.map((f, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid rgba(228,237,245,0.04)" }}>
-              <span style={{ fontSize: 9, color: "#00d2aa", fontFamily: "monospace", flexShrink: 0 }}>{i + 1}</span>
-              <span style={{ fontSize: 11, color: "rgba(228,237,245,0.6)", fontFamily: "monospace" }}>{f}</span>
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "7px 10px",
+              borderRadius: 6,
+              background: i === 0 ? "rgba(255,255,255,0.04)" : "transparent",
+              transition: "background 0.1s",
+            }}>
+              <span style={{
+                fontSize: 9, fontWeight: 700,
+                color: i === 0 ? color : "rgba(228,237,245,0.2)",
+                fontFamily: "monospace", width: 14, flexShrink: 0,
+              }}>{i + 1}</span>
+              <span style={{ fontSize: 11, color: i === 0 ? "rgba(228,237,245,0.8)" : "rgba(228,237,245,0.45)", fontFamily: "monospace" }}>
+                {f}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: "8px 18px 14px", borderTop: "1px solid rgba(228,237,245,0.04)" }}>
-        <div style={{ fontSize: 9, color: "rgba(228,237,245,0.15)", fontFamily: "monospace" }}>
-          Earth Twin v0.1 · XGBoost · {predLabel}
+      {/* ── Footer ────────────────────────────── */}
+      <div style={{ margin: "16px 14px 16px" }}>
+        <div style={{ fontSize: 9, color: "rgba(228,237,245,0.12)", fontFamily: "monospace", letterSpacing: "0.06em" }}>
+          EARTH TWIN v0.1 · XGBOOST · {predLabel}
         </div>
       </div>
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function StatCard({ label, value, color, definition }: {
+  label: string; value: number; color: string; definition?: string;
+}) {
   return (
-    <div style={{ fontSize: 9, color: "rgba(228,237,245,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-      {children}
-    </div>
-  );
-}
-
-function formatProb(value: number): { display: string; suffix: string } {
-  if (value < 0.001) return { display: "< 0.1", suffix: "%" };
-  if (value < 0.01) return { display: (value * 100).toFixed(2), suffix: "%" };
-  return { display: (value * 100).toFixed(1), suffix: "%" };
-}
-
-function MetricRow({ label, value, color, definition }: { label: string; value: number; color: string; definition?: string }) {
-  const { display, suffix } = formatProb(value);
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div>
-          <span style={{ fontSize: 11, color: "rgba(228,237,245,0.55)" }}>{label}</span>
-          {definition && (
-            <div style={{ fontSize: 9, color: "rgba(228,237,245,0.28)", marginTop: 2, lineHeight: 1.4, maxWidth: 160 }}>
-              {definition}
-            </div>
-          )}
+    <div style={{
+      padding: "12px 12px 10px",
+      background: "rgba(255,255,255,0.025)",
+      border: "1px solid rgba(255,255,255,0.05)",
+      borderRadius: 10,
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 9, color: "rgba(228,237,245,0.3)", letterSpacing: "0.06em", marginBottom: 6 }}>
+            {label.toUpperCase()}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "-0.02em", lineHeight: 1 }}>
+              {fmt(value)}
+            </span>
+            <span style={{ fontSize: 11, color: "rgba(228,237,245,0.25)", fontFamily: "monospace" }}>%</span>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 2, flexShrink: 0, marginLeft: 8 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace" }}>
-            {display}
-          </span>
-          <span style={{ fontSize: 11, color: "rgba(228,237,245,0.3)", fontFamily: "monospace" }}>{suffix}</span>
-        </div>
+        <Arc value={value} color={color} size={36} />
       </div>
-      <ProbBar value={value} color={color} />
-    </div>
-  );
-}
-
-function StatBox({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div style={{ background: "rgba(228,237,245,0.03)", border: "1px solid rgba(228,237,245,0.06)", borderRadius: 4, padding: "8px 10px" }}>
-      <div style={{ fontSize: 9, color: "rgba(228,237,245,0.3)", marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+      {definition && (
+        <div style={{ fontSize: 8, color: "rgba(228,237,245,0.22)", marginTop: 8, lineHeight: 1.5 }}>
+          {definition}
+        </div>
+      )}
     </div>
   );
 }
 
 const panelStyle: React.CSSProperties = {
-  width: 296,
+  width: 302,
   maxWidth: "100%",
   maxHeight: "100%",
-  background: "rgba(8, 16, 26, 0.97)",
-  backdropFilter: "blur(20px)",
-  borderLeft: "1px solid rgba(0, 210, 170, 0.12)",
+  background: "rgba(8, 14, 22, 0.97)",
+  backdropFilter: "blur(24px)",
+  borderLeft: "1px solid rgba(255,255,255,0.06)",
   overflowY: "auto",
   flexShrink: 0,
   pointerEvents: "auto",
-  boxShadow: "-4px 0 24px rgba(0,0,0,0.5)",
+  boxShadow: "-8px 0 40px rgba(0,0,0,0.6)",
   animation: "panel-in 0.18s ease-out",
-};
-
-const hrStyle: React.CSSProperties = {
-  border: "none",
-  borderTop: "1px solid rgba(228,237,245,0.06)",
-  margin: "14px 0",
 };
 
 const closeBtnStyle: React.CSSProperties = {
   background: "none",
   border: "none",
-  color: "rgba(228,237,245,0.3)",
+  color: "rgba(228,237,245,0.2)",
   cursor: "pointer",
-  fontSize: 14,
+  fontSize: 13,
   padding: 4,
   lineHeight: 1,
+  flexShrink: 0,
+  transition: "color 0.1s",
 };

@@ -2,18 +2,25 @@ import { RiskLayer } from "../types";
 
 interface Props {
   riskLayer: RiskLayer;
+  predictionFrom?: string | null;
+  predictionTo?: string | null;
   onLayerChange: (l: RiskLayer) => void;
+  onConceptOpen?: () => void;
 }
 
 const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
-  { value: "conflict",      label: "Conflict Risk", color: "#ff4466" },
-  { value: "regime_change", label: "Coup Risk", color: "#a855f7" },
+  { value: "overall",       label: "Overall",  color: "#00d2aa" },
+  { value: "conflict",      label: "Conflict", color: "#ff4466" },
+  { value: "regime_change", label: "Coup",     color: "#a855f7" },
 ];
 
-export function MobileToolbar({ riskLayer, onLayerChange }: Props) {
+export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange, onConceptOpen }: Props) {
+  const predRange = predictionFrom && predictionTo ? `${predictionFrom} – ${predictionTo}` : "1-Year Forecast";
+
   return (
     <div style={toolbarStyle}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        {/* Logo + site name */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={logoMark}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -23,14 +30,38 @@ export function MobileToolbar({ riskLayer, onLayerChange }: Props) {
           </div>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#e4edf5", letterSpacing: "0.06em" }}>EARTH TWIN</div>
-            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.4)" }}>1-YEAR FORECAST</div>
+            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.4)" }}>PROBABILISTIC WORLD MODEL · {predRange}</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
-          {(["#00d2aa", "#ffd440", "#ff4466"] as const).map((c, i) => (
-            <div key={i} style={{ width: 16, height: 5, background: c, borderRadius: 1, opacity: 0.8 }} />
-          ))}
-          <span style={{ fontSize: 9, color: "rgba(228,237,245,0.25)", marginLeft: 4 }}>LOW→HIGH</span>
+
+        {/* Right side: scale + concept button */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {(["#00d2aa", "#ffd440", "#ff4466"] as const).map((c, i) => (
+              <div key={i} style={{ width: 14, height: 4, background: c, borderRadius: 1, opacity: 0.8 }} />
+            ))}
+          </div>
+          {onConceptOpen && (
+            <button
+              onClick={onConceptOpen}
+              title="About Earth Twin"
+              style={{
+                background: "none",
+                border: "1px solid rgba(0,210,170,0.2)",
+                borderRadius: "50%",
+                width: 26, height: 26,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+                color: "rgba(0,210,170,0.6)",
+                fontSize: 12,
+                fontWeight: 700,
+                flexShrink: 0,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              ?
+            </button>
+          )}
         </div>
       </div>
 

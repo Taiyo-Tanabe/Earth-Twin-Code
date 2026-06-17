@@ -34,7 +34,10 @@ export default function App() {
       {isMobile ? (
         <MobileToolbar
           riskLayer={riskLayer}
+          predictionFrom={predictionFrom}
+          predictionTo={predictionTo}
           onLayerChange={setRiskLayer}
+          onConceptOpen={() => setShowConcept(true)}
         />
       ) : (
         <Toolbar
