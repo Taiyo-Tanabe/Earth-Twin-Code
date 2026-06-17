@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RiskLayer } from "../types";
 
 interface Props {
@@ -12,19 +13,37 @@ interface Props {
 }
 
 const LAYERS: { value: RiskLayer; label: string; color: string }[] = [
-  { value: "overall",       label: "Overall",  color: "#00d2aa" },
-  { value: "conflict",      label: "Conflict", color: "#ff4466" },
-  { value: "regime_change", label: "Coup",     color: "#a855f7" },
+  { value: "overall",       label: "Overall Risk",  color: "#00d2aa" },
+  { value: "conflict",      label: "Conflict Risk", color: "#ff4466" },
+  { value: "regime_change", label: "Coup Risk",     color: "#a855f7" },
 ];
 
-export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, availableYears = [], selectedYear, onLayerChange, onYearChange, onConceptOpen }: Props) {
-  const predRange = predictionFrom && predictionTo ? `${predictionFrom} – ${predictionTo}` : "1-Year Forecast";
+export function MobileToolbar({
+  riskLayer, predictionFrom, predictionTo,
+  availableYears = [], selectedYear,
+  onLayerChange, onYearChange, onConceptOpen,
+}: Props) {
+  const [open, setOpen] = useState(false);
+  const predRange = predictionFrom && predictionTo
+    ? `${predictionFrom} – ${predictionTo}`
+    : "Forecast";
+  const activeLayer = LAYERS.find((l) => l.value === riskLayer)!;
+
+  const handleLayer = (v: RiskLayer) => {
+    onLayerChange(v);
+    setOpen(false);
+  };
+  const handleYear = (y: number) => {
+    onYearChange?.(y);
+    setOpen(false);
+  };
 
   return (
-    <div style={toolbarStyle}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-        {/* Logo + site name */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <>
+      {/* Header bar — always visible */}
+      <div style={barStyle}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
           <div style={logoMark}>
             <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
               <circle cx="16" cy="16" r="13" stroke="#00d2aa" strokeWidth="1.2" opacity="0.9" />
@@ -40,78 +59,100 @@ export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, availab
               <line x1="17.8" y1="16" x2="19" y2="16" stroke="#00d2aa" strokeWidth="0.8" opacity="0.8" />
             </svg>
           </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#e4edf5", letterSpacing: "0.1em" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.1em" }}>
               <span style={{ color: "#00d2aa" }}>EARTH</span>
               <span style={{ color: "rgba(228,237,245,0.9)", marginLeft: 5 }}>TWIN</span>
             </div>
-            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.45)", letterSpacing: "0.12em", marginTop: 1 }}>PROBABILISTIC WORLD MODEL · {predRange}</div>
+            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.45)", letterSpacing: "0.1em", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ color: activeLayer.color }}>■</span>
+              {" "}{activeLayer.label} · {predRange}
+            </div>
           </div>
         </div>
 
-        {/* Right side: scale + concept button */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {(["#00d2aa", "#ffd440", "#ff4466"] as const).map((c, i) => (
-              <div key={i} style={{ width: 14, height: 4, background: c, borderRadius: 1, opacity: 0.8 }} />
-            ))}
-          </div>
+        {/* Right: ? + hamburger */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           {onConceptOpen && (
-            <button
-              onClick={onConceptOpen}
-              title="About Earth Twin"
-              style={{
-                background: "none",
-                border: "1px solid rgba(0,210,170,0.2)",
-                borderRadius: "50%",
-                width: 26, height: 26,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer",
-                color: "rgba(0,210,170,0.6)",
-                fontSize: 12,
-                fontWeight: 700,
-                flexShrink: 0,
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
+            <button onClick={onConceptOpen} style={iconBtn} title="About">
               ?
             </button>
           )}
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 4, width: "100%" }}>
-        {LAYERS.map((l) => (
-          <button key={l.value} onClick={() => onLayerChange(l.value)} style={chip(riskLayer === l.value, l.color)}>
-            {l.label}
+          <button onClick={() => setOpen((o) => !o)} style={iconBtn} title="Menu">
+            {open ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <line x1="2" y1="2" x2="12" y2="12" stroke="#00d2aa" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="12" y1="2" x2="2" y2="12" stroke="#00d2aa" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <line x1="2" y1="3.5" x2="12" y2="3.5" stroke="#00d2aa" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="2" y1="7" x2="12" y2="7" stroke="#00d2aa" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="2" y1="10.5" x2="12" y2="10.5" stroke="#00d2aa" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            )}
           </button>
-        ))}
+        </div>
       </div>
 
-      {availableYears.length > 1 && onYearChange && (
-        <div style={{ display: "flex", gap: 4, width: "100%" }}>
-          {availableYears.map((y) => (
-            <button key={y} onClick={() => onYearChange(y)} style={chip(selectedYear === y, "#60a5fa")}>
-              {y}
-            </button>
-          ))}
-        </div>
+      {/* Dropdown panel */}
+      {open && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 998, background: "rgba(0,0,0,0.4)" }}
+          />
+          {/* Panel */}
+          <div style={panelStyle}>
+            <div style={sectionLabel}>LAYER</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {LAYERS.map((l) => (
+                <button key={l.value} onClick={() => handleLayer(l.value)} style={menuItem(riskLayer === l.value, l.color)}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: l.color, display: "inline-block", marginRight: 10, opacity: riskLayer === l.value ? 1 : 0.4 }} />
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
+            {availableYears.length > 1 && onYearChange && (
+              <>
+                <div style={{ ...sectionLabel, marginTop: 16 }}>FORECAST YEAR</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {availableYears.map((y) => (
+                    <button key={y} onClick={() => handleYear(y)} style={yearChip(selectedYear === y)}>
+                      {y}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 4 }}>
+              {(["#00d2aa", "#aaff44", "#ffd440", "#ff9430", "#ff4466"] as const).map((c, i) => (
+                <div key={i} style={{ flex: 1, height: 4, background: c, borderRadius: 2, opacity: 0.7 }} />
+              ))}
+              <span style={{ fontSize: 8, color: "rgba(228,237,245,0.2)", marginLeft: 6, whiteSpace: "nowrap" }}>LOW→HIGH</span>
+            </div>
+          </div>
+        </>
       )}
-    </div>
+    </>
   );
 }
 
-const toolbarStyle: React.CSSProperties = {
+const barStyle: React.CSSProperties = {
   position: "absolute",
   top: 0, left: 0, right: 0,
   zIndex: 1000,
-  background: "rgba(8, 16, 26, 0.96)",
+  height: 52,
+  background: "rgba(8, 16, 26, 0.97)",
   backdropFilter: "blur(20px)",
   borderBottom: "1px solid rgba(0, 210, 170, 0.12)",
-  padding: "10px 14px 9px",
   display: "flex",
-  flexDirection: "column",
-  gap: 8,
+  alignItems: "center",
+  gap: 10,
+  padding: "0 12px",
 };
 
 const logoMark: React.CSSProperties = {
@@ -120,23 +161,69 @@ const logoMark: React.CSSProperties = {
   border: "1px solid rgba(0, 210, 170, 0.35)",
   display: "flex", alignItems: "center", justifyContent: "center",
   background: "radial-gradient(circle at 40% 40%, rgba(0,210,170,0.1) 0%, rgba(0,210,170,0.02) 70%)",
-  boxShadow: "0 0 10px rgba(0, 210, 170, 0.1), inset 0 0 6px rgba(0, 210, 170, 0.04)",
+  boxShadow: "0 0 10px rgba(0, 210, 170, 0.1)",
   flexShrink: 0,
 };
 
-function chip(active: boolean, color: string): React.CSSProperties {
+const panelStyle: React.CSSProperties = {
+  position: "absolute",
+  top: 52, left: 0, right: 0,
+  zIndex: 999,
+  background: "rgba(8, 16, 26, 0.98)",
+  backdropFilter: "blur(20px)",
+  borderBottom: "1px solid rgba(0, 210, 170, 0.15)",
+  padding: "16px 14px 18px",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+};
+
+const sectionLabel: React.CSSProperties = {
+  fontSize: 9,
+  color: "rgba(0,210,170,0.45)",
+  letterSpacing: "0.1em",
+  marginBottom: 8,
+  fontFamily: "monospace",
+};
+
+const iconBtn: React.CSSProperties = {
+  background: "none",
+  border: "1px solid rgba(0,210,170,0.2)",
+  borderRadius: "50%",
+  width: 30, height: 30,
+  display: "flex", alignItems: "center", justifyContent: "center",
+  cursor: "pointer",
+  color: "rgba(0,210,170,0.7)",
+  fontSize: 13,
+  fontWeight: 700,
+  WebkitTapHighlightColor: "transparent",
+};
+
+function menuItem(active: boolean, color: string): React.CSSProperties {
   return {
-    flex: 1,
-    background: active ? `${color}20` : "transparent",
-    color: active ? color : "rgba(228,237,245,0.35)",
-    border: `1px solid ${active ? `${color}60` : "rgba(228,237,245,0.08)"}`,
-    borderRadius: 3,
-    padding: "5px 10px",
-    fontSize: 11,
+    background: active ? `${color}18` : "transparent",
+    color: active ? color : "rgba(228,237,245,0.5)",
+    border: `1px solid ${active ? `${color}50` : "rgba(228,237,245,0.06)"}`,
+    borderRadius: 4,
+    padding: "9px 14px",
+    fontSize: 12,
+    fontWeight: active ? 700 : 400,
+    cursor: "pointer",
+    textAlign: "left",
+    WebkitTapHighlightColor: "transparent",
+    display: "flex",
+    alignItems: "center",
+  };
+}
+
+function yearChip(active: boolean): React.CSSProperties {
+  return {
+    background: active ? "rgba(96,165,250,0.15)" : "transparent",
+    color: active ? "#60a5fa" : "rgba(228,237,245,0.4)",
+    border: `1px solid ${active ? "rgba(96,165,250,0.5)" : "rgba(228,237,245,0.08)"}`,
+    borderRadius: 4,
+    padding: "6px 18px",
+    fontSize: 12,
     fontWeight: active ? 700 : 400,
     cursor: "pointer",
     WebkitTapHighlightColor: "transparent",
-    whiteSpace: "nowrap",
-    textAlign: "center",
   };
 }

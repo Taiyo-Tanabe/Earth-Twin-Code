@@ -27,7 +27,7 @@ export default function App() {
   };
   const selectedCountry = selectedCode ? getCountry(selectedCode) : null;
 
-  const toolbarHeight = isMobile ? 66 : 56;
+  const toolbarHeight = isMobile ? 52 : 56;
 
   const handleSelect = (code: string) =>
     setSelectedCode((prev) => (prev === code ? null : code));
