@@ -404,19 +404,13 @@ def global_map():
         else "WGI proxy: Sharp drop in political stability score (Powell-Thyne data unavailable)"
     )
 
-    from datetime import date, timedelta
-    try:
-        pred_year = int(model_version.split("-")[-1]) if model_version and model_version.startswith("xgb-v1-") else None
-    except (ValueError, AttributeError):
-        pred_year = None
-
-    if pred_year:
-        prediction_from = f"{pred_year}/01/01"
-        prediction_to   = f"{pred_year}/12/31"
+    from datetime import date
+    if data_year:
+        pred_year = data_year + max(1, date.today().year - data_year + 1)
     else:
-        today = date.today()
-        prediction_from = today.strftime("%Y/%m/%d")
-        prediction_to   = (today + timedelta(days=365)).strftime("%Y/%m/%d")
+        pred_year = date.today().year + 1
+    prediction_from = f"{pred_year}/01/01"
+    prediction_to   = f"{pred_year}/12/31"
 
     return GlobalMapResponse(
         countries=countries,
