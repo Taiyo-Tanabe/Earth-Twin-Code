@@ -1,0 +1,39 @@
+# Environment / secrets
+.env
+*.env.local
+
+# Data files (large, not versioned)
+backend/data/
+airflow/logs/
+airflow/__pycache__/
+
+# ML experiment tracking
+backend/mlruns/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
