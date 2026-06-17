@@ -11,15 +11,19 @@ import xgboost as xgb
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import roc_auc_score, brier_score_loss
 from pathlib import Path
-import mlflow
-import mlflow.xgboost
+try:
+    import mlflow
+    import mlflow.xgboost
+    _MLFLOW = True
+except Exception:
+    _MLFLOW = False
 import logging
 import os
 
 logger = logging.getLogger(__name__)
 
-PROCESSED_PATH = Path("/app/data/processed/")
-MODEL_PATH = Path("/app/data/models/")
+PROCESSED_PATH = Path(os.environ.get("DATA_PROCESSED_PATH", "/app/data/processed/"))
+MODEL_PATH = Path(os.environ.get("DATA_MODELS_PATH", "/app/data/models/"))
 
 FEATURE_COLS = [
     # 経済・社会指標
@@ -163,8 +167,8 @@ def train_conflict_model() -> dict:
     final_model = xgb.XGBClassifier(**XGB_PARAMS)
     final_model.fit(X, y, verbose=False)
 
-    # Platt Scaling でキャリブレーション
-    calibrated = CalibratedClassifierCV(final_model, method="sigmoid", cv="prefit")
+    # Platt Scaling でキャリブレーション (sklearn 1.4+ は cv="prefit" 非対応)
+    calibrated = CalibratedClassifierCV(final_model, method="sigmoid", cv=5)
     calibrated.fit(X, y)
 
     from ingestion.utils import save_joblib

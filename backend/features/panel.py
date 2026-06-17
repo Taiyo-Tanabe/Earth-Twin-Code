@@ -11,7 +11,8 @@ from ingestion.utils import save_parquet, save_csv
 
 logger = logging.getLogger(__name__)
 
-PROCESSED_PATH = Path("/app/data/processed/")
+import os as _os
+PROCESSED_PATH = Path(_os.environ.get("DATA_PROCESSED_PATH", "/app/data/processed/"))
 
 
 def build_lag_features(df: pd.DataFrame, target_col: str, lags: list[int] = [1, 2, 3]) -> pd.DataFrame:
