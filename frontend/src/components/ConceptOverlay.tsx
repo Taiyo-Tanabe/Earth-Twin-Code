@@ -47,47 +47,50 @@ export function ConceptOverlay({ onClose }: Props) {
 
           {/* Core statement */}
           <p style={leadStyle}>
-            Earth Twin is not a geopolitical prediction tool.
+            Wars and coups do not arise from
           </p>
           <p style={leadStyle}>
-            It is a <span style={{ color: "#00d2aa" }}>copy of the world.</span>
+            <span style={{ color: "#00d2aa" }}>political decisions alone.</span>
           </p>
 
           <div style={dividerStyle} />
 
           {/* Philosophy */}
           <Section title="The Premise">
-            Complex systems — wars, famines, revolutions, pandemics — do not arise
-            from political decisions alone. They emerge from the interaction of
-            physical, biological, ecological, economic, and social forces acting
-            simultaneously across every scale of reality.
+            Economic collapse, governance failure, destabilization of neighboring
+            states, climate stress, food crises, refugee flows — countless factors
+            intertwine, and when they cross a threshold, events move.
+            <br /><br />
+            Earth Twin observes all of these simultaneously and attempts to
+            reproduce the current state of the world as faithfully as possible.
           </Section>
 
           <Section title="The Method">
-            Earth Twin continuously ingests data from all observable domains:
-            seismic activity, solar storms, disease surveillance, crop yields,
-            ocean temperatures, commodity prices, democratic erosion, armed conflict
-            events, forest fires, refugee flows — and more, discovered autonomously
-            every six hours by an AI agent scanning for new open data sources.
+            Data is continuously collected from 13+ real-time sources: seismic
+            activity, weather, disease surveillance, food prices, democratic
+            erosion, armed conflict events, wildfires, refugee movements, and more.
             <br /><br />
-            All data streams are aggregated into a single world-state vector,
-            updated in real time as new observations arrive.
+            Every six hours, an AI agent autonomously discovers and integrates new
+            open data sources — expanding the model's coverage without human
+            intervention.
           </Section>
 
           <Section title="The Model">
-            Earth Twin uses machine learning models trained on decades of historical
-            data — governance indicators, economic conditions, conflict history,
-            neighboring country effects, and real-time streaming signals.
+            Machine learning models trained on decades of historical data translate
+            each country's observable state into a risk score: the estimated
+            probability of conflict or coup within the next 12 months.
             <br /><br />
-            The output is a probability between 0 and 1: the estimated likelihood
-            of conflict or coup within the next 12 months, given the current state
-            of each country's observable factors.
+            The output is always a probability. Reproduction of the world is never
+            complete — unobservable factors are countless. The number between 0
+            and 1 is an estimate derived from known factors,{" "}
+            <span style={{ color: "#00d2aa", fontStyle: "italic" }}>
+              not an absolute prediction.
+            </span>
           </Section>
 
           <Section title="The Goal">
-            To approximate, as closely as possible, the full state of the world
-            at every moment — so that the probability of any future event can be
-            read from the structure of the present.
+            To capture as much of the world's complexity as possible — so that
+            the risk embedded in the present can be read before it becomes the past.
           </Section>
 
           <div style={dividerStyle} />
