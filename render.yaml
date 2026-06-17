@@ -1,4 +1,5 @@
 services:
+  # ── API (Web Service) ─────────────────────────────────────────
   - type: web
     name: earth-twin-api
     runtime: python
@@ -7,6 +8,21 @@ services:
     startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
-        sync: false        # Set manually in Render dashboard (Neon connection string)
+        sync: false          # Neon connection string
       - key: ANTHROPIC_API_KEY
-        sync: false        # Optional: required only for AI Data Scout
+        sync: false
+
+  # ── Background Worker (collectors + stream processor + scout + daily predict)
+  - type: worker
+    name: earth-twin-worker
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements-workers.txt
+    startCommand: python worker.py
+    envVars:
+      - key: REDIS_URL
+        sync: false          # Upstash Redis URL
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

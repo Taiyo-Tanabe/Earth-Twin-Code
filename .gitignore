@@ -2,8 +2,14 @@
 .env
 *.env.local
 
-# Data files (large, not versioned)
-backend/data/
+# Data files — exclude everything except trained models and panel_latest
+backend/data/*
+!backend/data/models/
+backend/data/models/*
+!backend/data/models/*.pkl
+!backend/data/processed/
+backend/data/processed/*
+!backend/data/processed/panel_latest.parquet
 airflow/logs/
 airflow/__pycache__/
 
