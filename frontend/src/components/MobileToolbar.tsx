@@ -24,16 +24,28 @@ export function MobileToolbar({ riskLayer, predictionFrom, predictionTo, availab
     <div style={toolbarStyle}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
         {/* Logo + site name */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={logoMark}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9.5" stroke="#00d2aa" strokeWidth="1.5" />
-              <ellipse cx="12" cy="12" rx="4.5" ry="9.5" stroke="#00d2aa" strokeWidth="1" opacity="0.6" />
+            <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="13" stroke="#00d2aa" strokeWidth="1.2" opacity="0.9" />
+              <circle cx="16" cy="16" r="10" stroke="#00d2aa" strokeWidth="0.5" opacity="0.3" />
+              <ellipse cx="16" cy="16" rx="5" ry="13" stroke="#00d2aa" strokeWidth="0.8" opacity="0.55" />
+              <line x1="3" y1="16" x2="29" y2="16" stroke="#00d2aa" strokeWidth="0.8" opacity="0.55" />
+              <ellipse cx="16" cy="11" rx="9.5" ry="2" stroke="#00d2aa" strokeWidth="0.5" opacity="0.3" />
+              <ellipse cx="16" cy="21" rx="9.5" ry="2" stroke="#00d2aa" strokeWidth="0.5" opacity="0.3" />
+              <circle cx="16" cy="16" r="1.5" fill="#00d2aa" opacity="0.9" />
+              <line x1="16" y1="13" x2="16" y2="14.2" stroke="#00d2aa" strokeWidth="0.8" opacity="0.8" />
+              <line x1="16" y1="17.8" x2="16" y2="19" stroke="#00d2aa" strokeWidth="0.8" opacity="0.8" />
+              <line x1="13" y1="16" x2="14.2" y2="16" stroke="#00d2aa" strokeWidth="0.8" opacity="0.8" />
+              <line x1="17.8" y1="16" x2="19" y2="16" stroke="#00d2aa" strokeWidth="0.8" opacity="0.8" />
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#e4edf5", letterSpacing: "0.06em" }}>EARTH TWIN</div>
-            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.4)" }}>PROBABILISTIC WORLD MODEL · {predRange}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#e4edf5", letterSpacing: "0.1em" }}>
+              <span style={{ color: "#00d2aa" }}>EARTH</span>
+              <span style={{ color: "rgba(228,237,245,0.9)", marginLeft: 5 }}>TWIN</span>
+            </div>
+            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.45)", letterSpacing: "0.12em", marginTop: 1 }}>PROBABILISTIC WORLD MODEL · {predRange}</div>
           </div>
         </div>
 
@@ -103,10 +115,12 @@ const toolbarStyle: React.CSSProperties = {
 };
 
 const logoMark: React.CSSProperties = {
-  width: 24, height: 24,
-  border: "1px solid rgba(0, 210, 170, 0.28)",
+  width: 34, height: 34,
+  borderRadius: "50%",
+  border: "1px solid rgba(0, 210, 170, 0.35)",
   display: "flex", alignItems: "center", justifyContent: "center",
-  background: "rgba(0, 210, 170, 0.04)",
+  background: "radial-gradient(circle at 40% 40%, rgba(0,210,170,0.1) 0%, rgba(0,210,170,0.02) 70%)",
+  boxShadow: "0 0 10px rgba(0, 210, 170, 0.1), inset 0 0 6px rgba(0, 210, 170, 0.04)",
   flexShrink: 0,
 };
 
