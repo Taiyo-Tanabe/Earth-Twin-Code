@@ -27,6 +27,8 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, availableYear
   const vw = useViewportWidth();
   const showScale = vw >= 960;
   const showSubtitle = vw >= 880;
+  const showLayerStatus = vw >= 780;
+  const showModelActive = vw >= 640;
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
@@ -120,20 +122,30 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, availableYear
 
       {/* Status */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        {showLayerStatus && (
+          <>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: activeLayer.color }} />
+                <span style={{ fontSize: 10, fontWeight: 600, color: activeLayer.color }}>{activeLayer.label}</span>
+              </div>
+              <div style={{ fontSize: 9, color: "rgba(228,237,245,0.25)", marginTop: 2 }}>{predRange}</div>
+            </div>
+            <div style={sep} />
+          </>
+        )}
         <div style={{ textAlign: "right" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: activeLayer.color }} />
-            <span style={{ fontSize: 10, fontWeight: 600, color: activeLayer.color }}>{activeLayer.label}</span>
-          </div>
-          <div style={{ fontSize: 9, color: "rgba(228,237,245,0.25)", marginTop: 2 }}>{predRange}</div>
-        </div>
-        <div style={sep} />
-        <div style={{ textAlign: "right" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#00d2aa", animation: "pulse-dot 2.5s infinite" }} />
-            <span style={{ fontSize: 10, color: "#00d2aa", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" }}>MODEL ACTIVE</span>
-          </div>
-          <div style={{ fontSize: 8, color: "rgba(228,237,245,0.2)", marginTop: 1, fontFamily: "monospace" }}>{timeStr}</div>
+          {showModelActive ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#00d2aa", animation: "pulse-dot 2.5s infinite" }} />
+                <span style={{ fontSize: 10, color: "#00d2aa", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" }}>MODEL ACTIVE</span>
+              </div>
+              <div style={{ fontSize: 8, color: "rgba(228,237,245,0.2)", marginTop: 1, fontFamily: "monospace" }}>{timeStr}</div>
+            </>
+          ) : (
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#00d2aa", animation: "pulse-dot 2.5s infinite" }} />
+          )}
         </div>
 
         {onConceptOpen && (
