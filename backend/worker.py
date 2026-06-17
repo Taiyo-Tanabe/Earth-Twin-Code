@@ -88,11 +88,18 @@ def main():
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
+    task_map = {name: fn for name, fn in tasks}
     while True:
-        dead = [t.name for t in threads if not t.is_alive()]
-        if dead:
-            logger.warning(f"Dead threads: {dead}")
         time.sleep(300)
+        for i, t in enumerate(threads):
+            if not t.is_alive():
+                name = t.name
+                fn = task_map.get(name)
+                if fn:
+                    logger.warning(f"Thread '{name}' died — restarting")
+                    new_t = threading.Thread(target=fn, name=name, daemon=True)
+                    new_t.start()
+                    threads[i] = new_t
 
 
 if __name__ == "__main__":

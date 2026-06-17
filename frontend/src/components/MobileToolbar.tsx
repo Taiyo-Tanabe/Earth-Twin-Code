@@ -45,7 +45,7 @@ export function MobileToolbar({
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
           <div style={logoMark}>
-            <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+            <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
               <circle cx="16" cy="16" r="13" stroke="#00d2aa" strokeWidth="1.2" opacity="0.9" />
               <circle cx="16" cy="16" r="10" stroke="#00d2aa" strokeWidth="0.5" opacity="0.3" />
               <ellipse cx="16" cy="16" rx="5" ry="13" stroke="#00d2aa" strokeWidth="0.8" opacity="0.55" />
@@ -60,11 +60,11 @@ export function MobileToolbar({
             </svg>
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.1em" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.1em" }}>
               <span style={{ color: "#00d2aa" }}>EARTH</span>
-              <span style={{ color: "rgba(228,237,245,0.9)", marginLeft: 5 }}>TWIN</span>
+              <span style={{ color: "rgba(228,237,245,0.9)", marginLeft: 6 }}>TWIN</span>
             </div>
-            <div style={{ fontSize: 8, color: "rgba(0,210,170,0.45)", letterSpacing: "0.1em", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 9, color: "rgba(0,210,170,0.5)", letterSpacing: "0.08em", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               <span style={{ color: activeLayer.color }}>■</span>
               {" "}{activeLayer.label} · {predRange}
             </div>
@@ -145,29 +145,30 @@ const barStyle: React.CSSProperties = {
   position: "absolute",
   top: 0, left: 0, right: 0,
   zIndex: 1000,
-  height: 52,
-  background: "rgba(8, 16, 26, 0.97)",
-  backdropFilter: "blur(20px)",
-  borderBottom: "1px solid rgba(0, 210, 170, 0.12)",
+  height: 64,
+  background: "rgba(6, 10, 18, 0.98)",
+  backdropFilter: "blur(24px)",
+  borderBottom: "1px solid rgba(0, 210, 170, 0.15)",
+  boxShadow: "0 1px 0 rgba(0,210,170,0.06), 0 4px 24px rgba(0,0,0,0.5)",
   display: "flex",
   alignItems: "center",
-  gap: 10,
-  padding: "0 12px",
+  gap: 12,
+  padding: "0 14px",
 };
 
 const logoMark: React.CSSProperties = {
-  width: 34, height: 34,
+  width: 42, height: 42,
   borderRadius: "50%",
   border: "1px solid rgba(0, 210, 170, 0.35)",
   display: "flex", alignItems: "center", justifyContent: "center",
   background: "radial-gradient(circle at 40% 40%, rgba(0,210,170,0.1) 0%, rgba(0,210,170,0.02) 70%)",
-  boxShadow: "0 0 10px rgba(0, 210, 170, 0.1)",
+  boxShadow: "0 0 12px rgba(0, 210, 170, 0.12), inset 0 0 8px rgba(0,210,170,0.05)",
   flexShrink: 0,
 };
 
 const panelStyle: React.CSSProperties = {
   position: "absolute",
-  top: 52, left: 0, right: 0,
+  top: 64, left: 0, right: 0,
   zIndex: 999,
   background: "rgba(8, 16, 26, 0.98)",
   backdropFilter: "blur(20px)",
@@ -186,13 +187,13 @@ const sectionLabel: React.CSSProperties = {
 
 const iconBtn: React.CSSProperties = {
   background: "none",
-  border: "1px solid rgba(0,210,170,0.2)",
+  border: "1px solid rgba(0,210,170,0.25)",
   borderRadius: "50%",
-  width: 30, height: 30,
+  width: 36, height: 36,
   display: "flex", alignItems: "center", justifyContent: "center",
   cursor: "pointer",
-  color: "rgba(0,210,170,0.7)",
-  fontSize: 13,
+  color: "rgba(0,210,170,0.75)",
+  fontSize: 14,
   fontWeight: 700,
   WebkitTapHighlightColor: "transparent",
 };

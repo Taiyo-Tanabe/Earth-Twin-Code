@@ -83,9 +83,11 @@ def step3b_coups():
 def step4_vdem():
     logger.info(SEP)
     logger.info("STEP 4: V-Dem 民主主義指標取得 (失敗時スキップ)")
+    import datetime
+    end_year = datetime.date.today().year
     try:
         from ingestion.vdem import fetch_vdem
-        df = fetch_vdem(1990, 2024)
+        df = fetch_vdem(1990, end_year)
         if df.empty:
             logger.warning("  → V-Dem: データ取得失敗 (スキップ)")
         else:
@@ -99,9 +101,11 @@ def step4_vdem():
 def step5_unhcr():
     logger.info(SEP)
     logger.info("STEP 5: UNHCR 難民・避難民データ取得")
+    import datetime
+    end_year = datetime.date.today().year
     try:
         from ingestion.unhcr import fetch_unhcr
-        df = fetch_unhcr(2000, 2024)
+        df = fetch_unhcr(2000, end_year)
         logger.info(f"  → {len(df)} rows, {df['country_code'].nunique()} countries")
         return df
     except Exception as e:

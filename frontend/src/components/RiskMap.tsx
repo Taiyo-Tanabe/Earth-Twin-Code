@@ -124,21 +124,26 @@ function GeoJSONLayer({ countries, selectedCode, riskLayer, onCountryClick }: Pr
   return null;
 }
 
+const WORLD_BOUNDS: [[number, number], [number, number]] = [[-85, -180], [85, 180]];
+
 export function RiskMap({ countries, selectedCode, riskLayer, onCountryClick }: Props) {
   const isMobile = window.innerWidth < 768;
 
   return (
     <MapContainer
       center={[20, 0]}
-      zoom={isMobile ? 1 : 2}
-      minZoom={1}
+      zoom={isMobile ? 2 : 2}
+      minZoom={2}
       maxZoom={6}
+      maxBounds={WORLD_BOUNDS}
+      maxBoundsViscosity={1.0}
       style={{ height: "100%", width: "100%", background: "#06101a" }}
       zoomControl={false}
     >
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+        noWrap={true}
       />
       <GeoJSONLayer
         countries={countries}

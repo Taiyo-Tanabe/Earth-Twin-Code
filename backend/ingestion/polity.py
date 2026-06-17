@@ -17,8 +17,9 @@ from pathlib import Path
 import logging
 from ingestion.utils import save_parquet
 
+import os
 logger = logging.getLogger(__name__)
-PROCESSED_PATH = Path("/app/data/processed")
+PROCESSED_PATH = Path(os.environ.get("DATA_PROCESSED_PATH", "/app/data/processed"))
 
 WB_API = "https://api.worldbank.org/v2/country/all/indicator/{code}"
 
