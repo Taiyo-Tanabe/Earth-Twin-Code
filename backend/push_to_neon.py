@@ -6,9 +6,8 @@
   2. backend/ ディレクトリで実行:
        python push_to_neon.py
 """
-import os, json, math, sys
+import os, json, math, sys, datetime
 from pathlib import Path
-from datetime import datetime
 
 # ── .env を読み込む ──────────────────────────────────────────
 def _load_env():
@@ -116,7 +115,11 @@ def run():
     # パネルデータ読み込み
     latest_path = PROCESSED_PATH / "panel_latest.parquet"
     df = pd.read_parquet(latest_path)
-    print(f"[OK] panel_latest: {len(df)} countries, year={df['year'].max()}")
+    data_year = int(df["year"].max())
+    horizon = max(1, datetime.date.today().year - data_year)
+    pred_year = data_year + horizon          # モデルが実際に予測している年
+    model_version = f"xgb-v1-{pred_year}"  # API が予測期間を読み取るためにエンコード
+    print(f"[OK] panel_latest: {len(df)} countries, data_year={data_year}, pred_year={pred_year}")
 
     # 予測
     avail_c = [c for c in conflict_features if c in df.columns]
@@ -140,7 +143,7 @@ def run():
     connect_args = {"sslmode": "require"} if "neon.tech" in db_url else {}
     engine = sa.create_engine(db_url, connect_args=connect_args)
 
-    now  = datetime.utcnow()
+    now  = datetime.datetime.utcnow()
     rows = []
     for _, row in df.iterrows():
         regime_p = row.get("regime_change_probability", 0)
@@ -149,7 +152,7 @@ def run():
         rows.append({
             "time":                      now,
             "country_code":              row["country_code"],
-            "model_version":             "xgb-v1",
+            "model_version":             model_version,
             "conflict_probability":      float(row["conflict_probability"]),
             "regime_change_probability": float(regime_p),
             "risk_score":                float(row["risk_score"]),

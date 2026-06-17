@@ -404,17 +404,30 @@ def global_map():
         else "WGI proxy: Sharp drop in political stability score (Powell-Thyne data unavailable)"
     )
 
+    # model_version = "xgb-v1-{pred_year}" の形式からモデルが予測している年を復元
+    # 例: "xgb-v1-2026" → pred_year=2026 → 2026/01/01 〜 2026/12/31
+    # 読み取れない場合は今日 → 1年後にフォールバック
     from datetime import date, timedelta
-    today = date.today()
-    one_year_later = today + timedelta(days=365)
+    try:
+        pred_year = int(model_version.split("-")[-1]) if model_version and model_version.startswith("xgb-v1-") else None
+    except (ValueError, AttributeError):
+        pred_year = None
+
+    if pred_year:
+        prediction_from = f"{pred_year}/01/01"
+        prediction_to   = f"{pred_year}/12/31"
+    else:
+        today = date.today()
+        prediction_from = today.strftime("%Y/%m/%d")
+        prediction_to   = (today + timedelta(days=365)).strftime("%Y/%m/%d")
 
     return GlobalMapResponse(
         countries=countries,
         updated_at=updated_at,
         model_version=model_version,
         data_year=data_year,
-        prediction_from=today.strftime("%Y/%m/%d"),
-        prediction_to=one_year_later.strftime("%Y/%m/%d"),
+        prediction_from=prediction_from,
+        prediction_to=prediction_to,
         conflict_definition=conflict_def,
         regime_change_definition=regime_def,
     )
