@@ -75,15 +75,13 @@ export function ConceptOverlay({ onClose }: Props) {
           </Section>
 
           <Section title="The Model">
-            If the world were fully deterministic and perfectly observed, the future
-            would be calculable. It is neither. Quantum indeterminacy, chaotic
-            sensitivity to initial conditions, and the irreducible incompleteness of
-            any finite model mean that the future can only be expressed as a
-            probability distribution.
+            Earth Twin uses machine learning models trained on decades of historical
+            data — governance indicators, economic conditions, conflict history,
+            neighboring country effects, and real-time streaming signals.
             <br /><br />
-            Earth Twin's output — conflict risk, coup probability — is not a
-            forecast. It is the <span style={{ color: "#00d2aa", fontStyle: "italic" }}>
-            current entropy of the system,</span> expressed as a number between 0 and 1.
+            The output is a probability between 0 and 1: the estimated likelihood
+            of conflict or coup within the next 12 months, given the current state
+            of each country's observable factors.
           </Section>
 
           <Section title="The Goal">
