@@ -153,7 +153,8 @@ def train_conflict_model() -> dict:
 
     df = pd.read_parquet(panel_path)
     feature_cols = _extend_with_scout_cols(df, [c for c in FEATURE_COLS if c in df.columns])
-    metrics = walk_forward_validation(df, "label_conflict", feature_cols=feature_cols)
+    last_year = int(df["year"].max())
+    metrics = walk_forward_validation(df, "label_conflict", feature_cols=feature_cols, end_year=last_year)
 
     # 全データで最終モデルを学習
     X = df[feature_cols].fillna(df[feature_cols].median())
@@ -211,7 +212,8 @@ def train_regime_model() -> dict:
     regime_params = {**XGB_PARAMS, "scale_pos_weight": spw, "min_child_weight": 1}
 
     feature_cols = _extend_with_scout_cols(df, [c for c in REGIME_FEATURE_COLS if c in df.columns])
-    metrics = walk_forward_validation(df, "label_regime_change", feature_cols=feature_cols)
+    last_year = int(df["year"].max())
+    metrics = walk_forward_validation(df, "label_regime_change", feature_cols=feature_cols, end_year=last_year)
 
     logger.info(f"Regime model features ({len(feature_cols)}): {[f for f in feature_cols if 'regime' in f]}")
     X = df[feature_cols].fillna(df[feature_cols].median())

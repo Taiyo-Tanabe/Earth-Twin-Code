@@ -225,16 +225,21 @@ def build_panel() -> pd.DataFrame:
     latest_year = latest_df["year"].max()
     logger.info(f"Prediction panel saved: {latest_df.shape}, latest_year={latest_year} → {latest_path}")
 
-    # 11. ラベルを2年先にシフト (2024年特徴量 → 2026年の紛争を予測)
-    # shift(-2): 2022年特徴量→2024年ラベル で学習し、2024年特徴量→2026年を予測
-    df["label_conflict"] = df.groupby("country_code")["conflict_onset"].shift(-2)
+    # 11. ラベルシフト: 現在年 − データ最新年 を動的に計算
+    # 例: データ年=2023, 今=2026 → shift(-3) → 2023特徴量で2026を予測
+    import datetime as _dt
+    data_year = int(df["year"].max())
+    horizon = max(1, _dt.date.today().year - data_year)
+    logger.info(f"Label shift horizon: -{horizon} (data_year={data_year}, today={_dt.date.today().year})")
+
+    df["label_conflict"] = df.groupby("country_code")["conflict_onset"].shift(-horizon)
     df["label_regime_change"] = (
-        df.groupby("country_code")["regime_change"].shift(-2)
+        df.groupby("country_code")["regime_change"].shift(-horizon)
         if "regime_change" in df.columns
         else np.nan
     )
 
-    # ラベルがNaN（直近2年分）→ 除外
+    # ラベルがNaN（直近horizon年分）→ 除外
     df = df.dropna(subset=["label_conflict"])
 
     output_path = PROCESSED_PATH / "panel_features.parquet"
