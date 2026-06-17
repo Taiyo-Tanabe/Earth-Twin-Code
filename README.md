@@ -1,8 +1,6 @@
 # Earth Twin — 確率的世界モデル
 
-Earth Twin は地政学的予測ツールではない。**世界のコピー**だ。物理・生物・生態・経済・社会のシグナルをリアルタイムで吸収し、地球の状態を確率として再現する。
-
-> *複雑系を完全に再現できれば、宇宙に真の乱数が存在しない限り未来は確定する。完全な再現は不可能だから、我々は確率として表現する。*
+政治・経済・気象・社会など、複雑に絡み合う世界の要因をできる限り再現し、各国のリスクを確率として示すシステム。
 
 ![version](https://img.shields.io/badge/version-0.1-00d2aa?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square) ![Python](https://img.shields.io/badge/python-3.11-blue?style=flat-square) ![React](https://img.shields.io/badge/react-18-61dafb?style=flat-square)
 
