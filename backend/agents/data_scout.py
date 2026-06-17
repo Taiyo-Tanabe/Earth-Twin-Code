@@ -29,6 +29,16 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+def _get_db():
+    import sqlalchemy as sa
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        return None
+    connect_args = {"sslmode": "require"} if "neon.tech" in url else {}
+    return sa.create_engine(url, connect_args=connect_args)
+
+
 PROCESSED_PATH = Path("/app/data/processed")
 MODEL_PATH = Path("/app/data/models")
 AGENTS_LOG_PATH = Path("/app/data/scout_logs")
@@ -61,6 +71,7 @@ class DataScout:
             logger.warning("ANTHROPIC_API_KEY not set. Data Scout will run in analysis-only mode.")
 
         AGENTS_LOG_PATH.mkdir(parents=True, exist_ok=True)
+        self._restore_from_neon()
 
     # ──────────────────────────────────────────────────
     # 1. モデル性能分析
@@ -348,7 +359,7 @@ Pythonコードのみ返してください。説明不要。"""
                 logger.warning(f"Too many NaN: {nan_rate:.2f} > {DATA_QUALITY_MAX_NAN_RATE}")
                 return False
 
-            logger.info(f"✅ {feature_col}: validation passed")
+            logger.info(f"[OK] {feature_col}: validation passed")
             return True
 
         except subprocess.TimeoutExpired:
@@ -361,30 +372,117 @@ Pythonコードのみ返してください。説明不要。"""
             Path(tmp_path).unlink(missing_ok=True)
 
     # ──────────────────────────────────────────────────
-    # 5. レジストリ管理
+    # 5. レジストリ管理（Neon永続 + ローカルキャッシュ）
     # ──────────────────────────────────────────────────
     def _load_registry(self) -> dict:
-        """Scout が統合済みのデータソース一覧を読み込む"""
+        """Neon から統合済みソース一覧を読み込む。失敗時はローカルキャッシュを使用"""
+        import sqlalchemy as sa
+        engine = _get_db()
+        if engine:
+            try:
+                with engine.connect() as conn:
+                    rows = conn.execute(sa.text(
+                        "SELECT feature_col, name, url, ingestion_code FROM scout_registry"
+                    )).fetchall()
+                return {
+                    r[0]: {"name": r[1], "url": r[2], "ingestion_code": r[3], "feature_col": r[0]}
+                    for r in rows
+                }
+            except Exception as e:
+                logger.warning(f"Neon registry load failed, using local cache: {e}")
         if REGISTRY_PATH.exists():
             with open(REGISTRY_PATH) as f:
                 return json.load(f)
         return {}
 
-    def _save_to_registry(self, feature_col: str, name: str, url: str):
-        """統合成功したデータソースをレジストリに登録"""
+    def _save_to_registry(self, feature_col: str, name: str, url: str, code: str = ""):
+        """統合成功したデータソースを Neon とローカルキャッシュに登録"""
+        import sqlalchemy as sa
+        engine = _get_db()
+        if engine:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(sa.text("""
+                        INSERT INTO scout_registry (feature_col, name, url, ingestion_code, last_refreshed)
+                        VALUES (:fc, :name, :url, :code, NOW())
+                        ON CONFLICT (feature_col) DO UPDATE
+                            SET last_refreshed = NOW()
+                    """), {"fc": feature_col, "name": name, "url": url, "code": code})
+                logger.info(f"Registered in Neon: {feature_col}")
+            except Exception as e:
+                logger.warning(f"Neon registry save failed: {e}")
+
         registry = self._load_registry()
         registry[feature_col] = {
-            "name": name,
-            "feature_col": feature_col,
-            "ingestion_script": f"/app/ingestion/scout_{feature_col}.py",
-            "url": url,
-            "integrated_at": datetime.utcnow().isoformat(),
-            "last_updated": datetime.utcnow().isoformat(),
+            "name": name, "feature_col": feature_col,
+            "url": url, "integrated_at": datetime.utcnow().isoformat(),
         }
         REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(REGISTRY_PATH, "w") as f:
             json.dump(registry, f, indent=2, ensure_ascii=False)
-        logger.info(f"Registered: {feature_col} → {REGISTRY_PATH}")
+
+    def _write_features_to_neon(self, feature_col: str):
+        """検証済みの parquet データを Neon scout_features テーブルに書き込む"""
+        import sqlalchemy as sa
+        engine = _get_db()
+        if not engine:
+            return
+        dest = PROCESSED_PATH / f"{feature_col}.parquet"
+        if not dest.exists():
+            return
+        try:
+            df = pd.read_parquet(dest)
+            if "country_code" not in df.columns or "year" not in df.columns or feature_col not in df.columns:
+                return
+            rows = [
+                {
+                    "country_code": str(row["country_code"]),
+                    "year": int(row["year"]),
+                    "feature_col": feature_col,
+                    "value": float(row[feature_col]) if pd.notna(row[feature_col]) else None,
+                }
+                for _, row in df[["country_code", "year", feature_col]].iterrows()
+            ]
+            with engine.begin() as conn:
+                conn.execute(sa.text("""
+                    INSERT INTO scout_features (country_code, year, feature_col, value)
+                    VALUES (:country_code, :year, :feature_col, :value)
+                    ON CONFLICT (country_code, year, feature_col)
+                    DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+                """), rows)
+            logger.info(f"[OK] Wrote {len(rows)} rows to scout_features ({feature_col})")
+        except Exception as e:
+            logger.warning(f"Neon feature write failed for {feature_col}: {e}")
+
+    def _restore_from_neon(self):
+        """コンテナ再起動後、Neon からローカル parquet ファイルを復元する"""
+        import sqlalchemy as sa
+        engine = _get_db()
+        if not engine:
+            return
+        try:
+            with engine.connect() as conn:
+                feature_cols = [
+                    r[0] for r in conn.execute(
+                        sa.text("SELECT DISTINCT feature_col FROM scout_features")
+                    ).fetchall()
+                ]
+            for feature_col in feature_cols:
+                dest = PROCESSED_PATH / f"{feature_col}.parquet"
+                if dest.exists():
+                    continue
+                with engine.connect() as conn:
+                    rows = conn.execute(sa.text("""
+                        SELECT country_code, year, value FROM scout_features
+                        WHERE feature_col = :fc
+                    """), {"fc": feature_col}).fetchall()
+                if rows:
+                    df = pd.DataFrame(rows, columns=["country_code", "year", feature_col])
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    df.to_parquet(dest, index=False)
+                    logger.info(f"[OK] Restored {feature_col}.parquet from Neon ({len(df)} rows)")
+        except Exception as e:
+            logger.warning(f"Restore from Neon failed: {e}")
 
     def refresh_registered_sources(self) -> dict:
         """
@@ -418,10 +516,10 @@ Pythonコードのみ返してください。説明不要。"""
                     cwd="/app",
                 )
                 if result.returncode == 0:
-                    # last_updated を更新
                     registry[feature_col]["last_updated"] = datetime.utcnow().isoformat()
+                    self._write_features_to_neon(feature_col)
                     results["refreshed"].append(feature_col)
-                    logger.info(f"  ✅ Refreshed: {name}")
+                    logger.info(f"  [OK] Refreshed: {name}")
                 else:
                     logger.warning(f"  Failed: {result.stderr[:200]}")
                     results["failed"].append(feature_col)
@@ -500,17 +598,19 @@ Pythonコードのみ返してください。説明不要。"""
                     ingestion_file.write_text(code)
 
                     if self.execute_and_validate(code, feature_col):
+                        self._write_features_to_neon(feature_col)
                         self._save_to_registry(
                             feature_col=feature_col,
                             name=name,
                             url=suggestion.get("url", ""),
+                            code=code,
                         )
                         summary["integrated"].append({
                             "name": name,
                             "feature": feature_col,
                             "url": suggestion.get("url", ""),
                         })
-                        logger.info(f"  ✅ Integrated: {name} → {feature_col} ({len(summary['integrated'])}/{TARGET_INTEGRATIONS})")
+                        logger.info(f"  [OK] Integrated: {name} -> {feature_col} ({len(summary['integrated'])}/{TARGET_INTEGRATIONS})")
                     else:
                         summary["rejected"].append({"name": name, "reason": "validation failed"})
                         (PROCESSED_PATH / f"{feature_col}.parquet").unlink(missing_ok=True)
