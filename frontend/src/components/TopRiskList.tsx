@@ -37,9 +37,13 @@ export function TopRiskList({ countries, riskLayer, selectedCode, onSelect }: Pr
   return (
     <div style={containerStyle}>
       {/* Header */}
-      <div style={{ padding: "11px 14px 9px", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+      <div style={{ padding: "11px 14px 9px", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 9, color: "rgba(228,237,245,0.25)", letterSpacing: "0.1em" }}>
           {layerLabel.toUpperCase()} · TOP 5
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#00d2aa", animation: "pulse-dot 2.5s infinite" }} />
+          <span style={{ fontSize: 8, color: "#00d2aa", letterSpacing: "0.1em", fontFamily: "monospace" }}>AI</span>
         </div>
       </div>
 
@@ -114,10 +118,10 @@ const containerStyle: React.CSSProperties = {
   left: 12,
   zIndex: 800,
   width: 240,
-  background: "rgba(8, 14, 22, 0.94)",
+  background: "rgba(6, 10, 18, 0.96)",
   backdropFilter: "blur(20px)",
-  border: "1px solid rgba(255,255,255,0.07)",
-  borderRadius: 10,
+  border: "1px solid rgba(0,210,170,0.12)",
+  borderRadius: 6,
   overflow: "hidden",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,210,170,0.04), 0 0 24px rgba(0,210,170,0.04)",
 };

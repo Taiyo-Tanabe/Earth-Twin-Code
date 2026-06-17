@@ -22,6 +22,19 @@ body {
   color: #e4edf5;
 }
 
+/* ── Grid background ─────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,210,170,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,210,170,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* ── Animations ───────────────────────────────────── */
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -45,6 +58,18 @@ body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes scan-line {
+  0%   { top: 0%;   opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
 }
 
 /* ── Leaflet ──────────────────────────────────────── */

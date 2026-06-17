@@ -8,6 +8,10 @@ Earth Twin は、そのすべての要因を同時に観測し、世界の現在
 
 ![version](https://img.shields.io/badge/version-0.1-00d2aa?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-blue?style=flat-square) ![Python](https://img.shields.io/badge/python-3.11-blue?style=flat-square) ![React](https://img.shields.io/badge/react-18-61dafb?style=flat-square)
 
+## UI
+
+ダークモードのAIダッシュボード。グリッドテクスチャの背景、スキャンラインアニメーション、ヴィネット効果を持つインタラクティブな世界地図を中心に、3種のリスクレイヤー切り替え、国別リスク詳細パネル、リアルタイムTOP5リストを備える。
+
 ---
 
 ## ライブ

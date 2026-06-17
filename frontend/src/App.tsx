@@ -51,12 +51,35 @@ export default function App() {
       )}
 
       <div style={{ position: "relative", flex: 1, overflow: "hidden", marginTop: toolbarHeight }}>
+
+        {/* Vignette overlay */}
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 5,
+          background: "radial-gradient(ellipse at center, transparent 45%, rgba(6,10,18,0.65) 100%)",
+        }} />
+
+        {/* Scan line */}
+        <div style={{
+          position: "absolute", left: 0, right: 0, height: 1, zIndex: 6, pointerEvents: "none",
+          background: "linear-gradient(90deg, transparent, rgba(0,210,170,0.18) 30%, rgba(0,210,170,0.18) 70%, transparent)",
+          animation: "scan-line 10s linear infinite",
+        }} />
+
         {loading && (
           <div style={loadingStyle}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 32, height: 32, border: "2px solid rgba(0,210,170,0.15)", borderTopColor: "#00d2aa", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-              <div style={{ color: "#00d2aa", fontSize: 12, letterSpacing: "0.08em", fontFamily: "monospace" }}>
-                LOADING RISK DATA...
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+              <div style={{ position: "relative", width: 48, height: 48 }}>
+                <div style={{ position: "absolute", inset: 0, border: "1px solid rgba(0,210,170,0.15)", borderRadius: "50%" }} />
+                <div style={{ position: "absolute", inset: 0, border: "2px solid transparent", borderTopColor: "#00d2aa", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+                <div style={{ position: "absolute", inset: 8, border: "1px solid rgba(0,210,170,0.08)", borderRadius: "50%" }} />
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ color: "#00d2aa", fontSize: 11, letterSpacing: "0.14em", fontFamily: "monospace" }}>
+                  EARTH TWIN · INITIALIZING
+                </div>
+                <div style={{ color: "rgba(0,210,170,0.35)", fontSize: 9, letterSpacing: "0.1em", fontFamily: "monospace", marginTop: 6 }}>
+                  LOADING 150+ COUNTRIES · RISK MODEL ACTIVE
+                </div>
               </div>
             </div>
           </div>
@@ -103,7 +126,8 @@ export default function App() {
 
         {!isMobile && !selectedCode && !loading && (
           <div style={hintStyle}>
-            Click a country to view risk details
+            <span style={{ color: "rgba(0,210,170,0.5)", marginRight: 6 }}>◈</span>
+            SELECT A COUNTRY · AI RISK ANALYSIS
           </div>
         )}
       </div>
@@ -151,13 +175,15 @@ const hintStyle: React.CSSProperties = {
   left: "50%",
   transform: "translateX(-50%)",
   zIndex: 700,
-  background: "rgba(8, 16, 26, 0.88)",
+  background: "rgba(6, 10, 18, 0.92)",
   backdropFilter: "blur(12px)",
-  border: "1px solid rgba(0, 210, 170, 0.12)",
-  borderRadius: 99,
-  padding: "7px 18px",
-  fontSize: 12,
-  color: "rgba(228,237,245,0.35)",
+  border: "1px solid rgba(0, 210, 170, 0.15)",
+  borderRadius: 4,
+  padding: "6px 16px",
+  fontSize: 10,
+  fontFamily: "monospace",
+  letterSpacing: "0.1em",
+  color: "rgba(228,237,245,0.3)",
   pointerEvents: "none",
   whiteSpace: "nowrap",
 };

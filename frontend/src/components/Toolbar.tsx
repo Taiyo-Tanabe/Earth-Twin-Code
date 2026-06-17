@@ -111,7 +111,7 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, onLayerChange
         <div style={{ textAlign: "right" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#00d2aa", animation: "pulse-dot 2.5s infinite" }} />
-            <span style={{ fontSize: 10, color: "#00d2aa", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" }}>LIVE</span>
+            <span style={{ fontSize: 10, color: "#00d2aa", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.04em" }}>MODEL ACTIVE</span>
           </div>
           <div style={{ fontSize: 8, color: "rgba(228,237,245,0.2)", marginTop: 1, fontFamily: "monospace" }}>{timeStr}</div>
         </div>
@@ -153,9 +153,10 @@ const barStyle: React.CSSProperties = {
   position: "absolute",
   top: 0, left: 0, right: 0,
   zIndex: 1000,
-  background: "rgba(8, 16, 26, 0.96)",
-  backdropFilter: "blur(20px)",
-  borderBottom: "1px solid rgba(0, 210, 170, 0.12)",
+  background: "rgba(6, 10, 18, 0.98)",
+  backdropFilter: "blur(24px)",
+  borderBottom: "1px solid rgba(0, 210, 170, 0.1)",
+  boxShadow: "0 1px 0 rgba(0,210,170,0.06), 0 4px 24px rgba(0,0,0,0.4)",
   display: "flex",
   alignItems: "center",
   gap: 14,
