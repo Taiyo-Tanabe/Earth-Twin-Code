@@ -47,10 +47,10 @@ export function ConceptOverlay({ onClose }: Props) {
 
           {/* Core statement */}
           <p style={leadStyle}>
-            Wars and coups do not arise from
+            Earth Twin is not a geopolitical prediction tool.
           </p>
           <p style={leadStyle}>
-            <span style={{ color: "#00d2aa" }}>political decisions alone.</span>
+            It is a <span style={{ color: "#00d2aa" }}>copy of the world.</span>
           </p>
 
           <div style={dividerStyle} />
