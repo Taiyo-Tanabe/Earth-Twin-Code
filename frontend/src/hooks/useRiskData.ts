@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { CountryRisk, RiskLayer } from "../types";
 import { MOCK_COUNTRIES, MOCK_UPDATED_AT } from "../data/mockData";
 
-// Use relative /api prefix — Vite dev server proxies it to the backend
-// (avoids CORS: browser always fetches from same origin)
-const API_BASE = "/api";
+// Dev: "/api" is proxied by Vite to the local backend
+// Prod: set VITE_API_URL=https://your-app.onrender.com in Vercel env vars
+const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
 export function useRiskData() {
   const [countries, setCountries] = useState<CountryRisk[]>([]);

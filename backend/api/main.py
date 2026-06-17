@@ -75,8 +75,14 @@ class GlobalMapResponse(BaseModel):
 
 def _get_db():
     import sqlalchemy as sa
-    url = os.environ.get("TIMESCALE_URL", "postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin")
-    return sa.create_engine(url)
+    url = (
+        os.environ.get("DATABASE_URL") or
+        os.environ.get("TIMESCALE_URL") or
+        "postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin"
+    )
+    # Neon requires SSL; other hosts are fine without it
+    connect_args = {"sslmode": "require"} if "neon.tech" in url else {}
+    return sa.create_engine(url, connect_args=connect_args)
 
 
 def _compute_structural_risk(row) -> float:

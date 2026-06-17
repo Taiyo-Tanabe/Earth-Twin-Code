@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: earth-twin-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements-prod.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false        # Set manually in Render dashboard (Neon connection string)
+      - key: ANTHROPIC_API_KEY
+        sync: false        # Optional: required only for AI Data Scout
