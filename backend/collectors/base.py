@@ -44,8 +44,11 @@ class BaseCollector(ABC):
             "data": df.to_json(orient="records"),
         }, ensure_ascii=False)
         stream_key = f"earth_twin:stream:{self.name}"
-        self.redis.xadd(stream_key, {"payload": payload}, maxlen=10000)
-        logger.info(f"[{self.name}] +{len(df)} rows → {stream_key}")
+        try:
+            self.redis.xadd(stream_key, {"payload": payload}, maxlen=10000)
+            logger.info(f"[{self.name}] +{len(df)} rows → {stream_key}")
+        except Exception as e:
+            logger.warning(f"[{self.name}] Redis unavailable, skipping stream publish: {e}")
 
     def run_forever(self) -> None:
         logger.info(f"[{self.name}] collector started (interval={self.interval_seconds}s)")
