@@ -5,8 +5,6 @@ Earth Twin Collector Runner
 """
 import threading
 import logging
-import signal
-import sys
 import time
 
 logging.basicConfig(
@@ -75,13 +73,6 @@ def main():
         t.start()
         threads.append(t)
         logger.info(f"  ✓ {c.name} (every {c.interval_seconds}s)")
-
-    def _shutdown(sig, frame):
-        logger.info("Shutdown signal received")
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
 
     # メインスレッドは生存監視
     while True:

@@ -4,8 +4,6 @@ Airflow不要。6時間ごとにモデル弱点を分析し、新データソー
 """
 import time
 import logging
-import signal
-import sys
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,13 +17,6 @@ INTERVAL_SECONDS = 6 * 3600  # 6時間ごと
 def main():
     logger.info("Earth Twin Data Scout — continuous mode started")
     logger.info(f"Discovery interval: every {INTERVAL_SECONDS // 3600} hours")
-
-    def _shutdown(sig, frame):
-        logger.info("Shutdown signal received")
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
 
     while True:
         try:
