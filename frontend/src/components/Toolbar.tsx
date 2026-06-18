@@ -29,7 +29,7 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, availableYear
   const showSubtitle = vw >= 960;
   const showLayerStatus = vw >= 860;
   const showModelActive = vw >= 700;
-  const showForecastYear = vw >= 940;
+  const showForecastYear = vw >= 768;
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);

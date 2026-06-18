@@ -1,2 +1,1 @@
-[build]
-dockerfilePath = "backend/Dockerfile.worker"
+# Dockerfile per service is configured in Railway dashboard
