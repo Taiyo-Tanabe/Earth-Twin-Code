@@ -135,13 +135,14 @@ def _compute_structural_risk(row) -> float:
 
 def _load_panel_econ() -> dict:
     """panel_latest.parquet から経済指標・構造的脆弱性を国別マップとして返す"""
-    from pathlib import Path
-    import pandas as pd, math
-
-    path = Path("/app/data/processed/panel_latest.parquet")
-    if not path.exists():
-        return {}
     try:
+        from pathlib import Path
+        import pandas as pd, math
+
+        path = Path("/app/data/processed/panel_latest.parquet")
+        if not path.exists():
+            return {}
+
         df = pd.read_parquet(path)
         result = {}
         for _, row in df.iterrows():
