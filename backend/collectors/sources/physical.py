@@ -29,12 +29,24 @@ class SolarActivityCollector(BaseCollector):
 
         rows = []
         for item in data[-24:]:  # 直近24時間
-            if len(item) >= 2:
+            try:
+                if isinstance(item, dict):
+                    ts = item.get("time_tag") or item.get("time") or ""
+                    kp = item.get("kp") or item.get("Kp") or item.get("kp_index") or ""
+                elif isinstance(item, (list, tuple)) and len(item) >= 2:
+                    ts = item[0]
+                    kp = item[1]
+                else:
+                    continue
+                if not ts or ts == "time_tag":  # ヘッダ行をスキップ
+                    continue
                 rows.append({
-                    "timestamp": item[0],
-                    "kp_index": float(item[1]) if item[1] != "" else None,
-                    "year": int(item[0][:4]) if item[0] else datetime.now(timezone.utc).year,
+                    "timestamp": ts,
+                    "kp_index": float(kp) if kp not in ("", None) else None,
+                    "year": int(str(ts)[:4]) if ts else datetime.now(timezone.utc).year,
                 })
+            except Exception:
+                continue
 
         return pd.DataFrame(rows) if rows else pd.DataFrame()
 
@@ -59,17 +71,14 @@ class ForestFireCollector(BaseCollector):
         if df.empty or "latitude" not in df.columns:
             return pd.DataFrame()
 
-        df["year"] = datetime.now(timezone.utc).year
-        df["fetched_at"] = datetime.now(timezone.utc).isoformat()
-
-        # 緯度経度を国コードに変換は重いのでスキップし、グリッド集計のみ
-        agg = df.groupby("country_id", dropna=True).agg(
-            fire_count=("frp", "count"),
-            fire_power_avg=("frp", "mean"),
-        ).reset_index().rename(columns={"country_id": "country_code"})
-
-        agg["year"] = datetime.now(timezone.utc).year
-        return agg
+        now = datetime.now(timezone.utc)
+        frp_col = "frp" if "frp" in df.columns else df.columns[0]
+        return pd.DataFrame([{
+            "year": now.year,
+            "fire_count_global": len(df),
+            "fire_power_avg_global": float(df[frp_col].mean()) if frp_col in df.columns else 0.0,
+            "fetched_at": now.isoformat(),
+        }])
 
 
 class SeaTemperatureCollector(BaseCollector):

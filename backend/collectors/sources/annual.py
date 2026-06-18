@@ -53,8 +53,9 @@ class UCDPAnnualCollector(BaseCollector):
             _save_version(self.name, content_hash)
 
             # 本取得
-            from ingestion.ucdp import fetch_ucdp_ged
-            df = fetch_ucdp_ged()
+            import datetime as _dt
+            from ingestion.ucdp import build_conflict_panel
+            df = build_conflict_panel(1989, _dt.date.today().year)
             logger.info(f"[{self.name}] New UCDP data: {len(df)} rows")
             return df
         except Exception as e:
