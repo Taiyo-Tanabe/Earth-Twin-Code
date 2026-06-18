@@ -60,7 +60,7 @@ export function MobileToolbar({
             </svg>
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.1em" }}>
+            <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "0.1em", whiteSpace: "nowrap" }}>
               <span style={{ color: "#00d2aa" }}>EARTH</span>
               <span style={{ color: "rgba(228,237,245,0.9)", marginLeft: 6 }}>TWIN</span>
             </div>

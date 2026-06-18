@@ -25,10 +25,11 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, availableYear
   const activeLayer = LAYERS.find((l) => l.value === riskLayer)!;
   const [, setTick] = useState(0);
   const vw = useViewportWidth();
-  const showScale = vw >= 960;
-  const showSubtitle = vw >= 880;
-  const showLayerStatus = vw >= 780;
-  const showModelActive = vw >= 640;
+  const showScale = vw >= 1080;
+  const showSubtitle = vw >= 960;
+  const showLayerStatus = vw >= 860;
+  const showModelActive = vw >= 700;
+  const showForecastYear = vw >= 940;
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
@@ -86,8 +87,8 @@ export function Toolbar({ riskLayer, predictionFrom, predictionTo, availableYear
         </div>
       </div>
 
-      {/* Year selector — shown only when multiple years available */}
-      {availableYears.length > 1 && onYearChange && (
+      {/* Year selector — shown only when multiple years available and viewport is wide enough */}
+      {showForecastYear && availableYears.length > 1 && onYearChange && (
         <>
           <div style={sep} />
           <div style={group}>
