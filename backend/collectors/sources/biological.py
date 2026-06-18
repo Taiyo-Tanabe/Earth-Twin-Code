@@ -36,6 +36,8 @@ class WHODiseaseCollector(BaseCollector):
                         "infant_mortality_rate": item.get("NumericValue"),
                     })
 
+            if not rows:
+                return pd.DataFrame()
             df = pd.DataFrame(rows).dropna(subset=["country_code", "year"])
             df["year"] = pd.to_numeric(df["year"], errors="coerce")
             return df.dropna(subset=["year"])
@@ -80,13 +82,35 @@ class LocustCollector(BaseCollector):
     name = "desert_locust"
     interval_seconds = 86400  # 日次
 
+    # FAO locust hub RSS feed — fallback to summary row on parse error
+    _LOCUST_URLS = [
+        "https://locust-hub-hqfao.hub.arcgis.com/api/feed/rss/new",
+        "https://www.fao.org/ag/locusts/en/info/info/rss/index.html",
+    ]
+
     def fetch(self) -> pd.DataFrame:
-        url = "https://locust-hub-hqfao.hub.arcgis.com/api/feed/rss/new"
+        import xml.etree.ElementTree as ET
+
+        content = None
+        for url in self._LOCUST_URLS:
+            try:
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+                raw = resp.content.strip()
+                # Skip if response is HTML (error page)
+                if raw[:5].lower().startswith(b"<!doc") or raw[:6].lower().startswith(b"<html"):
+                    continue
+                content = raw
+                break
+            except Exception:
+                continue
+
+        if content is None:
+            logger.warning("Locust: no valid RSS feed available")
+            return pd.DataFrame()
+
         try:
-            resp = requests.get(url, timeout=30)
-            # RSSをパース
-            import xml.etree.ElementTree as ET
-            root = ET.fromstring(resp.content)
+            root = ET.fromstring(content)
             items = root.findall(".//item")
             rows = []
             for item in items:
@@ -100,6 +124,6 @@ class LocustCollector(BaseCollector):
                     "pub_date": pub_date,
                 })
             return pd.DataFrame(rows) if rows else pd.DataFrame()
-        except Exception as e:
+        except ET.ParseError as e:
             logger.warning(f"Locust fetch failed: {e}")
             return pd.DataFrame()
