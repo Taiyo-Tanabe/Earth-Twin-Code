@@ -72,7 +72,7 @@ export function MobileToolbar({
         </div>
 
         {/* Right: ? + hamburger */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: "auto" }}>
           {onConceptOpen && (
             <button onClick={onConceptOpen} style={iconBtn} title="About">
               ?
@@ -154,6 +154,7 @@ const barStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 12,
   padding: "0 14px",
+  overflow: "hidden",
 };
 
 const logoMark: React.CSSProperties = {

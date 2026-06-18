@@ -68,7 +68,11 @@ class DataScout:
     def __init__(self):
         self.api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if not self.api_key:
-            logger.warning("ANTHROPIC_API_KEY not set. Data Scout will run in analysis-only mode.")
+            logger.error(
+                "ANTHROPIC_API_KEY is not set! "
+                "Data Scout cannot call Claude API — no new sources will be discovered. "
+                "Set ANTHROPIC_API_KEY in Railway environment variables to enable AI discovery."
+            )
 
         AGENTS_LOG_PATH.mkdir(parents=True, exist_ok=True)
         self._restore_from_neon()
