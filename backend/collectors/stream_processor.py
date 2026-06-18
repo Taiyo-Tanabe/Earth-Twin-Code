@@ -68,15 +68,21 @@ def _trigger_predict():
 
 def process_stream(source_name: str):
     global _pending_rows
-    r = redis.from_url(REDIS_URL, decode_responses=True)
     stream_key = f"earth_twin:stream:{source_name}"
     last_id = "$"
+    backoff = 5
+    _error_logged = False
 
     logger.info(f"[processor:{source_name}] listening on {stream_key}")
 
     while True:
         try:
+            r = redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=10)
             messages = r.xread({stream_key: last_id}, count=10, block=5000)
+            if _error_logged:
+                logger.info(f"[processor:{source_name}] Redis reconnected")
+                _error_logged = False
+            backoff = 5
             for _stream, entries in (messages or []):
                 for msg_id, fields in entries:
                     last_id = msg_id
@@ -91,8 +97,14 @@ def process_stream(source_name: str):
                     except Exception as e:
                         logger.error(f"[processor:{source_name}] message error: {e}")
         except redis.RedisError as e:
-            logger.warning(f"Redis error: {e}")
-            time.sleep(5)
+            if not _error_logged:
+                logger.warning(
+                    f"[processor:{source_name}] Redis unavailable: {e}. "
+                    f"Set REDIS_URL env var in Railway. Retrying silently."
+                )
+                _error_logged = True
+            time.sleep(backoff)
+            backoff = min(backoff * 2, 300)
 
 
 def run_all_processors(source_names: list[str]):
