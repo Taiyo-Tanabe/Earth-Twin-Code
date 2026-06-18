@@ -177,7 +177,7 @@ class DataScout:
 【現在の状況】
 - 対象国数: {analysis.get('n_countries', '不明')}
 - データ最新年: {analysis.get('latest_year', '不明')}
-- 紛争率 (陽性比): {analysis.get('conflict_rate', '不明'):.3f}
+- 紛争率 (陽性比): {f"{analysis['conflict_rate']:.3f}" if 'conflict_rate' in analysis else '不明'}
 
 【タスク】
 上記の弱点を補う、**無料・APIキー不要・直接ダウンロード可能**な新しいデータソースを{MAX_SUGGESTIONS_PER_CALL}個提案してください。
