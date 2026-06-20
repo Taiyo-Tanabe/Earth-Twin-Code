@@ -159,8 +159,15 @@ class DataScout:
 
         client = anthropic.Anthropic(api_key=self.api_key)
 
-        feature_str = json.dumps(analysis.get("feature_importance", {}), indent=2)
-        missing_str = json.dumps(analysis.get("missing_data", {}), indent=2)
+        def _to_json_safe(obj):
+            if isinstance(obj, dict):
+                return {k: _to_json_safe(v) for k, v in obj.items()}
+            try:
+                return float(obj)
+            except (TypeError, ValueError):
+                return obj
+        feature_str = json.dumps(_to_json_safe(analysis.get("feature_importance", {})), indent=2)
+        missing_str = json.dumps(_to_json_safe(analysis.get("missing_data", {})), indent=2)
 
         prompt = f"""あなたは「Earth Twin」プロジェクトのデータサイエンティストです。
 このプロジェクトは各国の武力紛争・政権崩壊リスクを予測するXGBoostモデルを運用しています。
