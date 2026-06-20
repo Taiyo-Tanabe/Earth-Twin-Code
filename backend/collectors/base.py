@@ -50,15 +50,27 @@ class BaseCollector(ABC):
         except Exception as e:
             logger.warning(f"[{self.name}] Redis unavailable, skipping stream publish: {e}")
 
+    def _fetch_with_retry(self, retries: int = 3, backoff: int = 60) -> pd.DataFrame:
+        for attempt in range(retries):
+            try:
+                return self.fetch()
+            except Exception as e:
+                if attempt == retries - 1:
+                    raise
+                wait = backoff * (2 ** attempt)  # 60s → 120s → 240s
+                logger.warning(f"[{self.name}] fetch error (attempt {attempt + 1}/{retries}), retrying in {wait}s: {e}")
+                time.sleep(wait)
+        return pd.DataFrame()
+
     def run_forever(self) -> None:
         logger.info(f"[{self.name}] collector started (interval={self.interval_seconds}s)")
         while True:
             t0 = time.monotonic()
             try:
-                df = self.fetch()
+                df = self._fetch_with_retry()
                 self.publish(df)
             except Exception as e:
-                logger.error(f"[{self.name}] fetch error: {e}", exc_info=True)
+                logger.error(f"[{self.name}] fetch failed after all retries: {e}", exc_info=True)
             elapsed = time.monotonic() - t0
             sleep = max(0, self.interval_seconds - elapsed)
             time.sleep(sleep)

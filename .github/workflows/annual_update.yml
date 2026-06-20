@@ -40,7 +40,12 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: python pipeline_runner.py --to-step 9 --skip-gdelt
+        run: |
+          for attempt in 1 2 3; do
+            python pipeline_runner.py --to-step 9 --skip-gdelt && break
+            echo "Attempt $attempt failed."
+            [ $attempt -lt 3 ] && echo "Retrying in 5 minutes..." && sleep 300
+          done
 
       - name: Push predictions to Neon
         working-directory: backend
