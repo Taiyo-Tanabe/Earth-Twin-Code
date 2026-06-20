@@ -51,10 +51,9 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 | サービス | 役割 |
 |---|---|
 | Vercel | フロントエンドホスティング |
-| Render | FastAPI バックエンド |
+| Railway | FastAPI バックエンド・バックグラウンドワーカー |
 | Neon | PostgreSQL（予測 DB） |
 | Upstash | Redis Streams |
-| Railway | バックグラウンドワーカー（$5/月クレジット内） |
 
 ---
 
@@ -67,7 +66,7 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 └──────────────────────────┬──────────────────────────────────┘
                            │ HTTPS /global_map?year=2026|2027
 ┌──────────────────────────▼──────────────────────────────────┐
-│                  Render (FastAPI)                            │
+│                  Railway (FastAPI)                           │
 │   /global_map?year=  ·  available_years[]  ·  /health       │
 └──────────────────────────┬──────────────────────────────────┘
                            │ PostgreSQL
@@ -124,10 +123,20 @@ horizon = 今年 − データ最新年 + n
 | 項目 | 内容 |
 |---|---|
 | ラベル | UCDP GED: 年25件以上の戦闘死者が発生した場合を「紛争あり」と定義 |
-| 主要特徴量 | WGI 政治安定性・V-Dem 民主主義指数・GDP 成長率・過去の紛争ラグ・隣国スピルオーバー |
 | バリデーション | Walk-Forward Cross-Validation（1990〜2022年） |
 | ROC-AUC | **0.977** |
 | Brier Score | 0.040 |
+
+**主要特徴量（重要度順）：**
+
+| カテゴリ | 特徴量 |
+|---|---|
+| 紛争履歴 | `conflict_onset_lag1/2/3`（過去1〜3年の紛争有無）· `conflict_onset_rolling5y`（5年間紛争率） |
+| 近傍スピルオーバー | `neighbor_conflict_avg`（隣国の紛争率加重平均） |
+| ガバナンス (WGI) | `pv_est`（政治安定性）· `va_est`（発言・説明責任）· `rl_est`（法の支配）· `ge_est`（政府効率性）· `cc_est`（汚職抑制） |
+| 民主主義 (V-Dem) | `v2x_polyarchy`（選挙民主主義）· `v2x_libdem`（自由民主主義） |
+| 経済 | `gdp_per_capita_log`（対数 GDP）· `gdp_growth`（成長率）· `inflation`（インフレ率） |
+| 人口圧力 | `refugees_per_capita`（人口あたり難民数）· `population`（人口） |
 
 ### クーデターモデル（XGBoost）
 
@@ -143,12 +152,35 @@ horizon = 今年 − データ最新年 + n
 risk_score = conflict_probability × 0.6 + regime_change_probability × 0.4
 ```
 
+### 構造的脆弱性スコア（structural_risk）
+
+モデル予測とは独立して、WGI・V-Dem・経済指標から「構造的な脆弱性」を 0〜1 で算出します。現在の紛争状態に依存しないため、平和だが不安定な国の差別化に使用します。
+
+```
+structural_risk =
+  (1 − 政治安定性)  × 0.20
++ (1 − 民主主義指数) × 0.12
++ (1 − log(GDP))    × 0.12
++ (1 − 発言責任)    × 0.09
++ (1 − 法の支配)    × 0.09
++ 過去5年紛争率      × 0.09
++ 隣国紛争平均       × 0.05
++ その他（腐敗・インフレ・難民・貿易） × 0.24
+```
+
 ---
 
 ## 工夫した点
 
 ### 1. AI によるデータ自律発見（Data Scout）
-Claude が6時間ごとに新しいオープンデータソースを探索し、コードを自動生成・検証して品質基準を満たしたデータを統合します。Railway コンテナが再起動しても Neon の `scout_registry` テーブルから復元されるため、発見済みのデータが失われることはありません。
+Claude が6時間ごとに新しいオープンデータソースを探索し、Python コードを自動生成・実行・検証して品質基準を満たしたデータを統合します。
+
+**品質検証の基準（3条件すべてを満たす必要がある）：**
+- カバー国数 ≥ 50カ国
+- カバー年数 ≥ 5年
+- NaN 率 ≤ 40%
+
+Railway コンテナが再起動しても Neon の `scout_registry` テーブルから復元されるため、発見済みのデータが失われることはありません。サイクルごとに最低 5件の統合を目標とし、達成するまで最大 3ラウンド繰り返します。
 
 ### 2. 複数予測年の同時提供
 2026年・2027年の2つのモデルを保持しており、`GET /global_map?year=2026` のように年単位で予測を取得できます。UI のツールバーで年を切り替えるだけで比較でき、`available_years` フィールドによってクライアントが利用可能な年を動的に把握できます。
@@ -240,15 +272,29 @@ Claude が6時間ごとに新しいオープンデータソースを探索し、
 git clone https://github.com/Taiyo-Tanabe/Earth-Twin-Code.git
 cd Earth-Twin-Code
 
+# .env を作成（Neon の接続文字列を設定）
+echo "DATABASE_URL=postgresql://..." > .env
+
+# Docker Compose で API + フロントエンドを起動
+docker compose up --build
+```
+
+| URL | サービス |
+|---|---|
+| http://localhost:3000 | フロントエンド（Vite dev server） |
+| http://localhost:8002 | バックエンド API |
+
+Docker を使わない場合：
+
+```bash
+# バックエンド API（ポート 8002）
+cd backend
+pip install -r requirements-api.txt
+DATABASE_URL=postgresql://... uvicorn api.main:app --reload --port 8002
+
 # フロントエンド
 cd frontend
-cp .env.local.example .env.local   # VITE_API_URL を設定
 npm install && npm run dev
-
-# バックエンド API
-cd backend
-pip install -r requirements.txt
-python -m uvicorn api.main:app --reload --port 8001
 ```
 
 ---
