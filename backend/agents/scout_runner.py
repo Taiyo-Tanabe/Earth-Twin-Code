@@ -11,12 +11,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("scout_runner")
 
-INTERVAL_SECONDS = 30 * 24 * 3600  # 30日ごと
+INTERVAL_SECONDS = 6 * 3600  # 6時間ごと
 
 
 def main():
     logger.info("Earth Twin Data Scout — continuous mode started")
-    logger.info(f"Discovery interval: every {INTERVAL_SECONDS // 86400} days")
+    logger.info(f"Discovery interval: every {INTERVAL_SECONDS // 3600} hours")
 
     while True:
         try:
@@ -30,7 +30,7 @@ def main():
         except Exception as e:
             logger.error(f"Scout cycle failed: {e}", exc_info=True)
 
-        logger.info(f"Next cycle in {INTERVAL_SECONDS // 86400} days")
+        logger.info(f"Next cycle in {INTERVAL_SECONDS // 3600} hours")
         time.sleep(INTERVAL_SECONDS)
 
 
