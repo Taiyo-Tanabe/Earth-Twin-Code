@@ -23,7 +23,7 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 | 予測タスク | 紛争発生確率・クーデター試み確率 |
 | 予測精度 | 紛争 ROC-AUC **0.977** · クーデター ROC-AUC **0.825** |
 | 予測年 | 2026年・2027年（UI で切り替え可能） |
-| 月間コスト | **ほぼ $0**（Vercel・Railway・Neon・Upstash は無料プラン。Data Scout の Claude Haiku API は月1回の実行で約 $0.01） |
+| 月間コスト | **約 $1**（Vercel・Railway・Neon・Upstash は無料プラン。Data Scout の Claude Haiku API のみ 6時間ごと実行で約 $0.84/月） |
 
 ---
 
@@ -43,7 +43,8 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 ### データパイプライン
 - UCDP・V-Dem・World Bank・WGI・UNHCR・GDELT など複数のオープンデータを統合する 9ステップの ETL パイプラインを構築しています。
 - **Upstash Redis Streams** でリアルタイムデータをキューイングしています。
-- **Claude AI（Data Scout）** が月次で新しいオープンデータソースを自律的に発見し、テンプレートベースのコード生成で品質基準を満たしたものを自動で統合します。
+- **Claude AI（Data Scout）** が6時間ごとに新しいオープンデータソースを自律的に発見し、テンプレートベースのコード生成で品質基準を満たしたものを自動で統合します。
+- **週次 XGBoost 再学習**：GDELT リアルタイムストリームを Neon から年次集計し、最新のニュースシグナルを反映した状態でモデルを毎週再学習します。
 - **GitHub Actions** で年次のモデル再学習を完全自動化しています。
 
 ### インフラ（すべて無料プラン）
@@ -85,9 +86,13 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 │  │           │ XADD → Upstash Redis Streams                 │
 │  ├─ ストリームプロセッサ → Neon raw_signals                   │
 │  │                                                          │
-│  ├─ Data Scout（月次: 毎月1日）                              │
+│  ├─ Data Scout（6時間ごと）                                  │
 │  │   Claude が新データソースを自律発見・テンプレートで検証・統合  │
 │  │   発見データは Neon に永続化（Railway 再起動後も保持）        │
+│  │                                                          │
+│  ├─ 週次再学習（7日ごと）                                    │
+│  │   raw_signals(GDELT) → gdelt_annual.parquet 更新         │
+│  │   → build_panel() → XGBoost 再学習 → Neon 書き込み        │
 │  │                                                          │
 │  └─ 日次予測（24時間ごと）                                   │
 │      2026年モデル + 2027年モデルで全266カ国を予測              │
@@ -185,13 +190,27 @@ Railway コンテナが再起動しても Neon の `scout_registry` テーブル
 ### 2. 複数予測年の同時提供
 2026年・2027年の2つのモデルを保持しており、`GET /global_map?year=2026` のように年単位で予測を取得できます。UI のツールバーで年を切り替えるだけで比較でき、`available_years` フィールドによってクライアントが利用可能な年を動的に把握できます。
 
-### 3. 年次自動再学習（GitHub Actions）
+### 3. GDELT リアルタイムシグナルの週次学習反映
+
+GDELT（15分更新）はリアルタイムで Neon の `raw_signals` テーブルに蓄積されます。週次再学習のタイミングで `raw_signals` を年次集計し `gdelt_annual.parquet` を上書きしてから `build_panel()` を呼ぶことで、直近のニュース報道量・メディアトーン・ゴールドスタインスケールが毎週モデルに反映されます。
+
+```
+GDELTCollector (15分) → raw_signals (Neon)
+                              ↓ 週次
+               update_gdelt_annual_from_raw_signals()
+                              ↓
+              gdelt_annual.parquet（歴史データ保持・最新年上書き）
+                              ↓
+           build_panel() → train() → push_to_neon()
+```
+
+### 4. 年次自動再学習（GitHub Actions）
 毎年2月（UCDP 更新）と4月（V-Dem 更新）に CI が自動起動し、データ取得 → 特徴量生成 → モデル学習 → Neon 更新 → git push まで無人で完結します。
 
-### 4. $0 のフルスタック運用
+### 5. $0 のフルスタック運用
 すべてのコンポーネントを無料プランで構成しており、月額コストほぼ $0 のまま266カ国を常時監視できます。
 
-### 5. API パフォーマンス最適化
+### 6. API パフォーマンス最適化
 - **GZip ミドルウェア**（minimum_size=500B）でレスポンスを約 70% 圧縮
 - **TTL キャッシュ**（1時間）で parquet 読み込みと DB クエリをリクエストごとに実行しない
 - **SQLAlchemy 接続プール**（pool_size=5）でモジュールレベルの接続管理を実現
@@ -264,10 +283,11 @@ Railway コンテナが再起動しても Neon の `scout_registry` テーブル
 
 | 内容 | タイミング | 方法 |
 |---|---|---|
-| リアルタイムシグナル | 常時 | Railway → Upstash → Neon |
-| 日次予測 | 24時間ごと | Railway → 2年分 → Neon |
-| 新データソース発見 | 月次（毎月1日） | Data Scout（Claude） |
-| モデル再学習 | **年1〜2回（自動）** | GitHub Actions |
+| リアルタイムシグナル | 常時 | Railway コレクター → Upstash → Neon raw_signals |
+| 日次予測 | 24時間ごと | 既存モデルで全266カ国予測 → Neon |
+| 新データソース発見 | 6時間ごと | Data Scout（Claude Haiku） |
+| **週次再学習** | **7日ごと** | **GDELT 同期 → panel 再構築 → XGBoost 再学習 → Neon** |
+| 年次データ更新 + 再学習 | **年1〜2回（自動）** | GitHub Actions（UCDP 2月・V-Dem 4月） |
 
 ---
 
