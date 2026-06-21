@@ -76,7 +76,12 @@ def _run_weekly_retrain():
             import datetime
             logger.info("[weekly-retrain] === START ===")
 
-            # 1. パネル再構築
+            # 0. GDELT: raw_signals から gdelt_annual.parquet を最新化
+            logger.info("[weekly-retrain] Step 0/3: syncing GDELT from raw_signals -> gdelt_annual.parquet")
+            from ingestion.gdelt import update_gdelt_annual_from_raw_signals
+            update_gdelt_annual_from_raw_signals()
+
+            # 1. パネル再構築（最新 GDELT 込み）
             logger.info("[weekly-retrain] Step 1/3: rebuilding feature panel")
             from features.panel import build_panel
             build_panel()

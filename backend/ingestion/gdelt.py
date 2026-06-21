@@ -211,3 +211,77 @@ def get_latest_gdelt_day() -> pd.DataFrame:
         target_date = date.today() - timedelta(days=1)
 
     return fetch_gdelt_events_day(target_date)
+
+
+def update_gdelt_annual_from_raw_signals(
+    dest: Path = None,
+    lookback_days: int = 400,
+) -> pd.DataFrame:
+    """
+    Neon の raw_signals テーブルに蓄積された GDELT ストリームデータを
+    年次集計して gdelt_annual.parquet に反映する。
+
+    既存の歴史データは保持し、raw_signals に存在する年のみ上書きする。
+    weekly_retrain の前に呼ぶことで、直近の GDELT シグナルが学習に反映される。
+    """
+    import os
+    from datetime import datetime, timedelta
+    import sqlalchemy as sa
+
+    if dest is None:
+        dest = PROCESSED_PATH / "gdelt_annual.parquet"
+
+    db_url = os.environ.get("DATABASE_URL") or os.environ.get("TIMESCALE_URL")
+    if not db_url:
+        logger.warning("DATABASE_URL not set — skipping GDELT raw_signals update")
+        return pd.DataFrame()
+
+    cutoff = datetime.utcnow() - timedelta(days=lookback_days)
+
+    try:
+        connect_args = {"sslmode": "require"} if "neon.tech" in db_url else {}
+        engine = sa.create_engine(db_url, connect_args=connect_args)
+
+        with engine.connect() as conn:
+            rows = conn.execute(sa.text("""
+                SELECT
+                    payload->>'country_code'                        AS country_code,
+                    EXTRACT(YEAR FROM ingested_at)::int             AS year,
+                    AVG((payload->>'gdelt_goldstein_avg')::float)   AS gdelt_goldstein_avg,
+                    AVG((payload->>'gdelt_tone_avg')::float)        AS gdelt_tone_avg,
+                    SUM((payload->>'gdelt_events')::float)          AS gdelt_conflict_events
+                FROM raw_signals
+                WHERE source = 'gdelt'
+                  AND ingested_at >= :cutoff
+                  AND payload->>'country_code' IS NOT NULL
+                GROUP BY payload->>'country_code', EXTRACT(YEAR FROM ingested_at)
+            """), {"cutoff": cutoff}).fetchall()
+
+        if not rows:
+            logger.info("No GDELT data in raw_signals yet — skipping update")
+            return pd.DataFrame()
+
+        fresh = pd.DataFrame(
+            rows,
+            columns=["country_code", "year", "gdelt_goldstein_avg", "gdelt_tone_avg", "gdelt_conflict_events"],
+        )
+        fresh["year"] = fresh["year"].astype(int)
+        fresh_years = set(fresh["year"].unique())
+        logger.info(f"GDELT from raw_signals: {len(fresh)} country-years, years={sorted(fresh_years)}")
+
+        # 既存の歴史データと合成 — raw_signals にある年のみ上書き、過去は保持
+        if dest.exists():
+            historical = pd.read_parquet(dest)
+            historical = historical[~historical["year"].isin(fresh_years)]
+            merged = pd.concat([historical, fresh], ignore_index=True)
+        else:
+            merged = fresh
+
+        merged = merged.sort_values(["country_code", "year"]).reset_index(drop=True)
+        save_parquet(merged, dest)
+        logger.info(f"gdelt_annual.parquet updated: {len(merged)} rows total")
+        return merged
+
+    except Exception as e:
+        logger.warning(f"GDELT raw_signals update failed (non-fatal): {e}")
+        return pd.DataFrame()
