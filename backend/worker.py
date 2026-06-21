@@ -5,6 +5,7 @@ Single process that runs all background tasks as threads:
   - Stream processor (Redis -> Neon)
   - Data Scout (every 6h, discovers new sources)
   - Daily predict (every 24h, re-runs predictions -> Neon)
+  - Weekly retrain (every 7d, rebuild panel + retrain XGBoost -> Neon)
 """
 import os
 import threading
@@ -62,6 +63,48 @@ def _run_daily_predict():
         time.sleep(INTERVAL)
 
 
+def _run_weekly_retrain():
+    """
+    週次で panel を再構築 → XGBoost 再学習 → 予測 → Neon 書き込み。
+    年次データ更新（UCDP/V-Dem/WB）や GDELT の蓄積を即座に反映する。
+    """
+    INTERVAL = 7 * 24 * 3600
+    logger.info("Weekly retrain loop started (every 7 days)")
+    time.sleep(3600)  # 起動後1時間待って collectors が安定してから実行
+    while True:
+        try:
+            import datetime
+            logger.info("[weekly-retrain] === START ===")
+
+            # 1. パネル再構築
+            logger.info("[weekly-retrain] Step 1/3: rebuilding feature panel")
+            from features.panel import build_panel
+            build_panel()
+
+            # 2. XGBoost 再学習（今年・来年の2モデル）
+            logger.info("[weekly-retrain] Step 2/3: training XGBoost models")
+            from models.train import train_conflict_model, train_regime_model
+            today = datetime.date.today()
+            for pred_year in [today.year, today.year + 1]:
+                conflict_metrics = train_conflict_model(pred_year)
+                regime_metrics   = train_regime_model(pred_year)
+                logger.info(
+                    f"[weekly-retrain] pred_year={pred_year} "
+                    f"conflict_AUC={conflict_metrics.get('roc_auc', 'N/A'):.3f} "
+                    f"regime_AUC={regime_metrics.get('roc_auc', 'N/A')}"
+                )
+
+            # 3. 予測を Neon に書き込み
+            logger.info("[weekly-retrain] Step 3/3: pushing predictions -> Neon")
+            from push_to_neon import run as push
+            push()
+
+            logger.info("[weekly-retrain] === DONE ===")
+        except Exception as e:
+            logger.error(f"[weekly-retrain] failed: {e}", exc_info=True)
+        time.sleep(INTERVAL)
+
+
 def main():
     logger.info("=" * 60)
     logger.info("Earth Twin Worker — starting all background tasks")
@@ -72,6 +115,7 @@ def main():
         ("stream-processor", _run_stream_processor),
         ("data-scout",       _run_scout),
         ("daily-predict",    _run_daily_predict),
+        ("weekly-retrain",   _run_weekly_retrain),
     ]
 
     threads = []
