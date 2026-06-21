@@ -43,7 +43,7 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 ### データパイプライン
 - UCDP・V-Dem・World Bank・WGI・UNHCR・GDELT など複数のオープンデータを統合する 9ステップの ETL パイプラインを構築しています。
 - **Upstash Redis Streams** でリアルタイムデータをキューイングしています。
-- **Claude AI（Data Scout）** が6時間ごとに新しいオープンデータソースを自律的に発見し、テンプレートベースのコード生成で品質基準を満たしたものを自動で統合します。
+- **Claude AI（Data Scout）** が6時間ごとに **Web Search** でリアルタイムにオープンデータソースを検索・発見し、テンプレートベースのコード生成で品質基準を満たしたものを自動で統合します。
 - **週次 XGBoost 再学習**：GDELT リアルタイムストリームを Neon から年次集計し、最新のニュースシグナルを反映した状態でモデルを毎週再学習します。
 - **GitHub Actions** で年次のモデル再学習を完全自動化しています。
 
@@ -86,9 +86,9 @@ XGBoost で学習した予測モデルが、GDP・民主主義指標・難民数
 │  │           │ XADD → Upstash Redis Streams                 │
 │  ├─ ストリームプロセッサ → Neon raw_signals                   │
 │  │                                                          │
-│  ├─ Data Scout（6時間ごと）                                  │
-│  │   Claude が新データソースを自律発見・テンプレートで検証・統合  │
-│  │   発見データは Neon に永続化（Railway 再起動後も保持）        │
+│  ├─ Data Scout（6時間ごと・Web Search + Interleaved Thinking有効）│
+│  │   Claude Haiku が Web 検索で新データソースをリアルタイム発見  │
+│  │   テンプレートで自動検証・統合、発見データは Neon 永続化     │
 │  │                                                          │
 │  ├─ 週次再学習（7日ごと）                                    │
 │  │   raw_signals(GDELT) → gdelt_annual.parquet 更新         │
@@ -178,7 +178,7 @@ structural_risk =
 ## 工夫した点
 
 ### 1. AI によるデータ自律発見（Data Scout）
-毎月1日に Claude が新しいオープンデータソースを探索し、テンプレートベースのコードで自動取得・検証・統合します。コード生成は Claude に頼らずテンプレートで賄うため API コストを最小化しています。
+6時間ごとに Claude Haiku が **Web Search（`tools=[{"type":"web_search"}]`）** でリアルタイムにデータソースを検索し、Interleaved Thinking（`betas=["interleaved-thinking-2025-05-14"]`）で検索結果を推論したうえで新しいオープンデータソースを提案します。テンプレートベースのコードで自動取得・検証・統合し、コード生成に Claude を呼ばないため API コストは月額 $0.84 に最小化されています。
 
 **品質検証の基準（3条件すべてを満たす必要がある）：**
 - カバー国数 ≥ 50カ国

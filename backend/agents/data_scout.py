@@ -13,7 +13,7 @@ Claude APIを使って、モデルの弱点を分析し、
 必要な環境変数:
   ANTHROPIC_API_KEY: Claude API キー
 
-スケジュール: Airflow data_scout_dag で月次実行
+スケジュール: Railway バックグラウンドワーカー scout_runner で6時間ごと自動実行
 """
 import os
 import json
@@ -181,12 +181,48 @@ class DataScout:
 [{{"name":"...","url":"直接DL URL(CSV/JSON/ZIP)","country_col":"国コード列","year_col":"年列","value_cols":["値列"],"feature_col_name":"panel列名"}}]"""
 
         try:
+            messages = [{"role": "user", "content": prompt}]
+
+            # First call with web search enabled
             response = client.messages.create(
                 model=ANTHROPIC_MODEL,
-                max_tokens=800,
-                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1500,
+                messages=messages,
+                tools=[{"type": "web_search"}],
+                betas=["interleaved-thinking-2025-05-14"],
             )
-            text = response.content[0].text.strip()
+
+            # Process tool uses if any
+            if response.stop_reason == "tool_use":
+                messages.append({"role": "assistant", "content": response.content})
+
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use" and block.name == "web_search":
+                        logger.info(f"Web search query: {block.input.get('query', '')}")
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": f"[Web search performed for: {block.input.get('query', '')}]"
+                        })
+
+                messages.append({"role": "user", "content": tool_results})
+
+                # Second call with search results
+                response = client.messages.create(
+                    model=ANTHROPIC_MODEL,
+                    max_tokens=1500,
+                    messages=messages,
+                    betas=["interleaved-thinking-2025-05-14"],
+                )
+
+            # Extract text from final response
+            text = ""
+            for block in response.content:
+                if hasattr(block, "text"):
+                    text += block.text
+
+            text = text.strip()
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
