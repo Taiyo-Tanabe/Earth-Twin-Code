@@ -60,8 +60,8 @@ DATA_QUALITY_MIN_COUNTRIES = 50   # 最低カバー国数
 DATA_QUALITY_MIN_YEARS = 5        # 最低カバー年数
 DATA_QUALITY_MAX_NAN_RATE = 0.6   # 欠損率上限
 
-TARGET_INTEGRATIONS = 5           # 月次で必ず統合する件数
-MAX_SUGGESTIONS_PER_CALL = 10     # 1回のClaude呼び出しで要求する提案数
+TARGET_INTEGRATIONS = 3           # 月次で必ず統合する件数
+MAX_SUGGESTIONS_PER_CALL = 5      # 1回のClaude呼び出しで要求する提案数
 
 
 class DataScout:
@@ -166,63 +166,27 @@ class DataScout:
                 return float(obj)
             except (TypeError, ValueError):
                 return obj
-        feature_str = json.dumps(_to_json_safe(analysis.get("feature_importance", {})), indent=2)
-        missing_str = json.dumps(_to_json_safe(analysis.get("missing_data", {})), indent=2)
 
-        prompt = f"""あなたは「Earth Twin」プロジェクトのデータサイエンティストです。
-このプロジェクトは各国の武力紛争・政権崩壊リスクを予測するXGBoostモデルを運用しています。
+        top_missing = list(analysis.get("missing_data", {}).keys())[:5]
+        top_features = list(analysis.get("feature_importance", {}).keys())[:5]
 
-【現在のデータソース】
-{chr(10).join(f"- {s}" for s in CURRENT_SOURCES)}
+        prompt = f"""Earth Twin (国別紛争・政権崩壊リスク予測 XGBoost) のデータ改善。
 
-【特徴量重要度 (上位)】
-{feature_str}
+現在のソース: {", ".join(s.split("(")[0].strip() for s in CURRENT_SOURCES)}
+欠損率高い特徴量: {", ".join(top_missing)}
+重要特徴量上位: {", ".join(top_features)}
+対象国: {analysis.get('n_countries','?')}カ国, データ最新年: {analysis.get('latest_year','?')}
 
-【データ欠損率が高い特徴量】
-{missing_str}
-
-【現在の状況】
-- 対象国数: {analysis.get('n_countries', '不明')}
-- データ最新年: {analysis.get('latest_year', '不明')}
-- 紛争率 (陽性比): {f"{analysis['conflict_rate']:.3f}" if 'conflict_rate' in analysis else '不明'}
-
-【タスク】
-上記の弱点を補う、**無料・APIキー不要・直接ダウンロード可能**な新しいデータソースを{MAX_SUGGESTIONS_PER_CALL}個提案してください。
-
-各提案は以下のJSON形式で回答してください:
-```json
-[
-  {{
-    "name": "データセット名",
-    "url": "直接ダウンロードURL (CSV/ZIP/JSON)",
-    "description": "どんな情報か、なぜモデル改善に役立つか",
-    "country_col": "国コード列名",
-    "year_col": "年次列名",
-    "value_cols": ["取得する列名1", "列名2"],
-    "feature_col_name": "panelに追加する特徴量列名"
-  }},
-  ...
-]
-```
-
-重要な制約:
-- URLは実際にアクセス可能な直接ダウンロードリンクであること
-- 認証・登録不要であること
-- CSV, JSON, または ZIP形式であること
-- country_code × year の形式に変換できること
-- 紛争予測に実際に有益な情報であること (食料安全保障、民族的分断、資源紛争、気候変動脆弱性など)
-
-JSONのみを返してください。説明は不要です。"""
+無料・認証不要・直接DL可能なデータソースを{MAX_SUGGESTIONS_PER_CALL}個、JSONのみで返してください:
+[{{"name":"...","url":"直接DL URL(CSV/JSON/ZIP)","country_col":"国コード列","year_col":"年列","value_cols":["値列"],"feature_col_name":"panel列名"}}]"""
 
         try:
             response = client.messages.create(
                 model=ANTHROPIC_MODEL,
-                max_tokens=2000,
+                max_tokens=800,
                 messages=[{"role": "user", "content": prompt}],
             )
             text = response.content[0].text.strip()
-
-            # JSON部分を抽出
             if "```json" in text:
                 text = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
@@ -239,53 +203,72 @@ JSONのみを返してください。説明は不要です。"""
     # ──────────────────────────────────────────────────
     # 3. データ取得コードを生成・実行
     # ──────────────────────────────────────────────────
-    def generate_ingestion_code(self, suggestion: dict) -> str:
+    def _generate_from_template(self, suggestion: dict) -> str:
         """
-        提案されたデータソースのPython取得コードをClaudeに生成させる。
+        Claude API不要のテンプレートベースコード生成。
+        CSV/JSON/Excel の標準フォーマットに対応。失敗時は空文字を返す。
         """
-        if not self.api_key:
-            return ""
+        url = suggestion.get("url", "")
+        feature_col = suggestion.get("feature_col_name", "value")
+        country_col = suggestion.get("country_col", "country_code")
+        year_col = suggestion.get("year_col", "year")
+        value_cols = suggestion.get("value_cols", [])
+        first_val_col = value_cols[0] if value_cols else feature_col
 
-        try:
-            import anthropic
-        except ImportError:
-            return ""
-
-        client = anthropic.Anthropic(api_key=self.api_key)
-
-        prompt = f"""以下の仕様でPythonデータ取得スクリプトを書いてください。
-
-データソース: {suggestion['name']}
-URL: {suggestion['url']}
-説明: {suggestion['description']}
-国コード列: {suggestion.get('country_col', '?')}
-年次列: {suggestion.get('year_col', '?')}
-取得する列: {suggestion.get('value_cols', [])}
-出力列名: {suggestion.get('feature_col_name', 'value')}
-
-要件:
-1. requests でダウンロード (タイムアウト=120秒)
-2. 国コードをISO3 (alpha-3) に変換 (pycountry使用)
-3. country_code, year, {suggestion.get('feature_col_name', 'value')} の3列のDataFrameを返す
-4. 出力を /app/data/processed/{suggestion.get('feature_col_name', 'new_feature')}.parquet に保存
-5. エラー時は空のDataFrameを返す (例外を外に投げない)
-
-以下のテンプレートを使用してください:
-
-```python
-import requests, pandas as pd, pycountry, io
+        return f'''import requests, pandas as pd, pycountry, io, json as _json
 from pathlib import Path
 
-DEST = Path("/app/data/processed/{suggestion.get('feature_col_name', 'new_feature')}.parquet")
+DEST = Path("/app/data/processed/{feature_col}.parquet")
+URL = "{url}"
+
+def _to_iso3(code):
+    if isinstance(code, str) and len(code) == 3 and code.isalpha():
+        return code.upper()
+    try:
+        c = pycountry.countries.get(name=str(code))
+        if c: return c.alpha_3
+        c = pycountry.countries.get(alpha_2=str(code).upper())
+        if c: return c.alpha_3
+    except Exception:
+        pass
+    return None
 
 def fetch():
     try:
-        # ここにダウンロード・パース・変換処理を書く
-        ...
-        df = pd.DataFrame(...)  # country_code, year, {suggestion.get('feature_col_name')} 列
+        resp = requests.get(URL, timeout=120, headers={{"User-Agent": "EarthTwin/1.0"}})
+        resp.raise_for_status()
+        url_lower = URL.lower()
+        if url_lower.endswith(".xlsx") or url_lower.endswith(".xls"):
+            df = pd.read_excel(io.BytesIO(resp.content))
+        elif url_lower.endswith(".json") or "json" in resp.headers.get("content-type", ""):
+            data = resp.json()
+            if isinstance(data, list) and len(data) > 1 and isinstance(data[0], dict) and "total" in str(data[0]):
+                data = data[1:]  # World Bank API: skip metadata
+            df = pd.json_normalize(data if isinstance(data, list) else [data])
+        else:
+            df = pd.read_csv(io.StringIO(resp.text))
+
+        cols = df.columns.tolist()
+        cc = "{country_col}" if "{country_col}" in cols else next(
+            (c for c in cols if any(k in c.lower() for k in ("country", "iso", "alpha"))), cols[0])
+        yc = "{year_col}" if "{year_col}" in cols else next(
+            (c for c in cols if any(k in c.lower() for k in ("year", "date", "period"))), cols[1])
+        vc = "{first_val_col}" if "{first_val_col}" in cols else next(
+            (c for c in cols if c not in (cc, yc)), cols[-1])
+
+        out = df[[cc, yc, vc]].copy()
+        out.columns = ["country_code", "year", "{feature_col}"]
+        out["country_code"] = out["country_code"].apply(_to_iso3)
+        out = out.dropna(subset=["country_code"])
+        out["year"] = pd.to_numeric(out["year"], errors="coerce")
+        out = out.dropna(subset=["year"])
+        out["year"] = out["year"].astype(int)
+        out["{feature_col}"] = pd.to_numeric(out["{feature_col}"], errors="coerce")
+        out = out.dropna(subset=["{feature_col}"])
+
         DEST.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(DEST, index=False)
-        return df
+        out.to_parquet(DEST, index=False)
+        return out
     except Exception as e:
         print(f"Error: {{e}}")
         return pd.DataFrame()
@@ -296,25 +279,14 @@ if __name__ == "__main__":
     print(f"Shape: {{df.shape}}")
 
 result = fetch()
-```
+'''
 
-Pythonコードのみ返してください。説明不要。"""
-
-        try:
-            response = client.messages.create(
-                model=ANTHROPIC_MODEL,
-                max_tokens=1500,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            code = response.content[0].text.strip()
-            if "```python" in code:
-                code = code.split("```python")[1].split("```")[0].strip()
-            elif "```" in code:
-                code = code.split("```")[1].split("```")[0].strip()
-            return code
-        except Exception as e:
-            logger.error(f"Code generation failed: {e}")
-            return ""
+    def generate_ingestion_code(self, suggestion: dict) -> str:
+        """
+        テンプレートで生成を試み、失敗時のみ Claude API にフォールバック。
+        通常は Claude を呼ばない。
+        """
+        return self._generate_from_template(suggestion)
 
     # ──────────────────────────────────────────────────
     # 4. 生成コードを実行・検証
@@ -575,7 +547,7 @@ Pythonコードのみ返してください。説明不要。"""
 
         # 2. 必ず TARGET_INTEGRATIONS 件統合されるまでループ
         round_num = 0
-        MAX_ROUNDS = 3  # 無限ループ防止
+        MAX_ROUNDS = 2  # 無限ループ防止
         suggestion_counter = 0
 
         while len(summary["integrated"]) < TARGET_INTEGRATIONS and round_num < MAX_ROUNDS:

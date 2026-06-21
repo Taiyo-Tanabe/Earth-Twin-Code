@@ -1,12 +1,32 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 from typing import Optional
+from pathlib import Path
+from functools import wraps
 import os
 import logging
+import time
 import pycountry
 
 logger = logging.getLogger(__name__)
+
+_cache: dict = {}
+
+def _ttl_cache(key: str, ttl: int = 300):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            now = time.time()
+            entry = _cache.get(key)
+            if entry and now - entry["ts"] < ttl:
+                return entry["val"]
+            val = fn(*args, **kwargs)
+            _cache[key] = {"val": val, "ts": now}
+            return val
+        return wrapper
+    return decorator
 
 # World Bank の地域集計コード（国ではない）
 _WB_AGGREGATES = {
@@ -40,6 +60,7 @@ def _country_name(iso3: str) -> str:
 
 app = FastAPI(title="Earth Twin API", version="0.1.0")
 
+app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -75,16 +96,21 @@ class GlobalMapResponse(BaseModel):
     regime_change_definition: str = "Powell-Thyne: Coup attempts against the incumbent head of state (successful or failed, 1950–present)"
 
 
+_engine = None
+
 def _get_db():
+    global _engine
+    if _engine is not None:
+        return _engine
     import sqlalchemy as sa
     url = (
         os.environ.get("DATABASE_URL") or
         os.environ.get("TIMESCALE_URL") or
         "postgresql://earthtwin:earthtwin123@timescaledb:5432/earthtwin"
     )
-    # Neon requires SSL; other hosts are fine without it
     connect_args = {"sslmode": "require"} if "neon.tech" in url else {}
-    return sa.create_engine(url, connect_args=connect_args)
+    _engine = sa.create_engine(url, connect_args=connect_args, pool_size=5, max_overflow=10)
+    return _engine
 
 
 def _compute_structural_risk(row) -> float:
@@ -133,10 +159,10 @@ def _compute_structural_risk(row) -> float:
     return clamp(score)
 
 
+@_ttl_cache("panel_econ", ttl=3600)
 def _load_panel_econ() -> dict:
     """panel_latest.parquet から経済指標・構造的脆弱性を国別マップとして返す"""
     try:
-        from pathlib import Path
         import pandas as pd, math
 
         path = Path("/app/data/processed/panel_latest.parquet")
@@ -165,6 +191,7 @@ def _load_panel_econ() -> dict:
         return {}
 
 
+@_ttl_cache("available_years", ttl=3600)
 def _load_available_years() -> list[int]:
     """Neonに存在するmodel_versionから利用可能な予測年リストを返す"""
     try:
@@ -185,6 +212,18 @@ def _load_available_years() -> list[int]:
         return sorted(years)
     except Exception:
         return []
+
+
+@_ttl_cache("data_year", ttl=3600)
+def _load_data_year() -> Optional[int]:
+    try:
+        import pandas as pd
+        panel_path = Path("/app/data/processed/panel_latest.parquet")
+        if panel_path.exists():
+            return int(pd.read_parquet(panel_path, columns=["year"])["year"].max())
+    except Exception:
+        pass
+    return None
 
 
 def _load_from_db(pred_year: int = None) -> tuple[list[dict], dict]:
@@ -408,17 +447,7 @@ def global_map(year: Optional[int] = None):
                 polity_score=stub.get("polity_score"),
             ))
 
-    # パネルデータの基準年を取得
-    data_year = None
-    try:
-        from pathlib import Path
-        import pandas as pd
-        panel_path = Path("/app/data/processed/panel_latest.parquet")
-        if panel_path.exists():
-            panel = pd.read_parquet(panel_path, columns=["year"])
-            data_year = int(panel["year"].max())
-    except Exception:
-        pass
+    data_year = _load_data_year()
 
     # 紛争データソースを確認 (ACLED vs UCDP)
     acled_path = Path("/app/data/processed/acled_panel.parquet")
